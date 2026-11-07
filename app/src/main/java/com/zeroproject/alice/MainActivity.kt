@@ -36,17 +36,25 @@ class MainActivity : Activity() {
     private lateinit var messageInput: EditText
 
     private lateinit var modelDownloader: AliceModelDownloader
+    private lateinit var localEngine: AliceLocalEngine
 
     private var modelProgress: ProgressBar? = null
     private var modelStatus: TextView? = null
     private var modelSize: TextView? = null
     private var modelActionButton: Button? = null
 
+    private var chatStatus: TextView? = null
+    private var sendButton: Button? = null
+
     private val chatHistory = mutableListOf<Pair<String, Boolean>>()
 
     private var isChatOpen = false
     private var isModelScreenOpen = false
     private var isDownloading = false
+
+    private var isInitializingAI = false
+    private var isGenerating = false
+    private var engineInitializationStarted = false
 
     private var lastBackPressedAt = 0L
 
@@ -58,6 +66,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         modelDownloader = AliceModelDownloader(this)
+        localEngine = AliceLocalEngine(this)
 
         window.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
@@ -68,8 +77,13 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+
         if (::modelDownloader.isInitialized) {
             modelDownloader.close()
+        }
+
+        if (::localEngine.isInitialized) {
+            localEngine.close()
         }
 
         super.onDestroy()
@@ -512,6 +526,11 @@ class MainActivity : Activity() {
         isChatOpen = true
         isModelScreenOpen = false
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+
+            window.setDecorFitsSystemWindows(false)
+        }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(navy)
@@ -519,8 +538,6 @@ class MainActivity : Activity() {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-
-            window.setDecorFitsSystemWindows(false)
 
             root.setOnApplyWindowInsetsListener { view, insets ->
 
@@ -560,6 +577,7 @@ class MainActivity : Activity() {
             isAllCaps = false
             backgroundTintList =
                 android.content.res.ColorStateList.valueOf(panel)
+
             setOnClickListener {
                 showHome()
             }
@@ -578,9 +596,13 @@ class MainActivity : Activity() {
 
         titleBox.addView(makeText("ALICE", 20f, silver, true))
 
-        titleBox.addView(
-            makeText("●  ДЕМОНСТРАЦИОННЫЙ РЕЖИМ", 10f, red)
+        chatStatus = makeText(
+            getAIStatusText(),
+            10f,
+            red
         )
+
+        titleBox.addView(chatStatus!!)
 
         header.addView(
             titleBox,
@@ -673,7 +695,7 @@ class MainActivity : Activity() {
             )
         )
 
-        val sendButton = Button(this).apply {
+        sendButton = Button(this).apply {
             text = "➤"
             textSize = 22f
             setTextColor(silver)
@@ -686,7 +708,7 @@ class MainActivity : Activity() {
         }
 
         composer.addView(
-            sendButton,
+            sendButton!!,
             LinearLayout.LayoutParams(dp(55), dp(50))
         )
 
@@ -707,7 +729,7 @@ class MainActivity : Activity() {
         if (chatHistory.isEmpty()) {
             chatHistory.add(
                 Pair(
-                    "Привет! Я Элис. Рада тебя видеть! ❤️\n\nПока я работаю в демонстрационном режиме, но скоро у меня появится настоящий искусственный интеллект.",
+                    "Привет! Я Элис. ❤️\n\nЯ запускаю свой локальный ИИ. Немного терпения!",
                     false
                 )
             )
@@ -720,9 +742,125 @@ class MainActivity : Activity() {
         }
 
         scrollToBottom()
+        updateChatControls()
+
+        // Запускаем Gemma при первом открытии чата.
+        initializeAI()
     }
 
-    // ОТПРАВКА СООБЩЕНИЯ
+    // СОСТОЯНИЕ ИИ
+
+    private fun getAIStatusText(): String {
+
+        return when {
+            isGenerating -> "●  ЭЛИС ДУМАЕТ..."
+            localEngine.isReady() -> "●  ЛОКАЛЬНЫЙ ИИ АКТИВЕН"
+            isInitializingAI -> "●  ЗАГРУЗКА ЛОКАЛЬНОГО ИИ..."
+            else -> "●  ОЖИДАНИЕ ИИ"
+        }
+    }
+
+    private fun updateChatControls() {
+
+        if (!isChatOpen) return
+
+        chatStatus?.text = getAIStatusText()
+
+        sendButton?.isEnabled =
+            localEngine.isReady() && !isGenerating
+
+        sendButton?.alpha =
+            if (sendButton?.isEnabled == true) 1f else 0.55f
+    }
+
+    // ИНИЦИАЛИЗАЦИЯ GEMMA
+
+    private fun initializeAI() {
+
+        if (localEngine.isReady()) {
+            updateChatControls()
+            return
+        }
+
+        if (isInitializingAI || engineInitializationStarted) {
+            updateChatControls()
+            return
+        }
+
+        val modelFile = File(
+            filesDir,
+            "gemma-4-E2B-it.litertlm"
+        )
+
+        if (!modelDownloader.isModelDownloaded() || !modelFile.exists()) {
+
+            chatHistory.add(
+                Pair(
+                    "Я пока не могу запуститься: модель Gemma не найдена. Открой раздел «Модель ИИ» и проверь загрузку.",
+                    false
+                )
+            )
+
+            if (isChatOpen) {
+                addBubble(chatHistory.last().first, false)
+            }
+
+            updateChatControls()
+            return
+        }
+
+        isInitializingAI = true
+        engineInitializationStarted = true
+
+        chatStatus?.text = "●  ЗАГРУЗКА GEMMA..."
+        updateChatControls()
+
+        localEngine.initialize(
+
+            onReady = {
+
+                isInitializingAI = false
+
+                if (isChatOpen) {
+
+                    chatStatus?.text =
+                        "●  ЛОКАЛЬНЫЙ ИИ АКТИВЕН"
+
+                    val text =
+                        "Я проснулась! ❤️ Теперь я могу отвечать с помощью локальной Gemma."
+
+                    chatHistory.add(Pair(text, false))
+                    addBubble(text, false)
+
+                    updateChatControls()
+                    scrollToBottom()
+                }
+            },
+
+            onError = { error ->
+
+                isInitializingAI = false
+
+                if (isChatOpen) {
+
+                    val text =
+                        "Не удалось запустить локальную модель:\n$error"
+
+                    chatHistory.add(Pair(text, false))
+                    addBubble(text, false)
+
+                    chatStatus?.text = "●  ОШИБКА ЗАПУСКА ИИ"
+
+                    updateChatControls()
+                    scrollToBottom()
+                }
+
+                showMessage("Ошибка запуска Gemma: $error")
+            }
+        )
+    }
+
+    // ОТПРАВКА СООБЩЕНИЯ В GEMMA
 
     private fun sendMessage() {
 
@@ -730,18 +868,94 @@ class MainActivity : Activity() {
 
         if (message.isEmpty()) return
 
+        if (!localEngine.isReady()) {
+
+            showMessage(
+                "Элис ещё загружает локальную модель"
+            )
+
+            return
+        }
+
+        if (isGenerating) return
+
         messageInput.setText("")
 
         chatHistory.add(Pair(message, true))
         addBubble(message, true)
 
-        val answer =
-            "Я получила твоё сообщение! ❤️\n\nПока я работаю без подключённой ИИ-модели. Настоящий интеллект мы добавим следующим этапом."
+        isGenerating = true
 
-        chatHistory.add(Pair(answer, false))
-        addBubble(answer, false)
+        chatHistory.add(
+            Pair("Элис думает...", false)
+        )
 
+        addBubble("Элис думает...", false)
+
+        updateChatControls()
         scrollToBottom()
+
+        localEngine.sendMessage(
+
+            text = message,
+
+            onResponse = { response ->
+
+                isGenerating = false
+
+                if (chatHistory.isNotEmpty() &&
+                    chatHistory.last().first == "Элис думает..."
+                ) {
+                    chatHistory.removeAt(chatHistory.lastIndex)
+                }
+
+                val answer = response.trim().ifEmpty {
+                    "Я получила пустой ответ от модели. Попробуй спросить ещё раз."
+                }
+
+                chatHistory.add(Pair(answer, false))
+
+                if (isChatOpen) {
+
+                    messagesLayout.removeAllViews()
+
+                    for (item in chatHistory) {
+                        addBubble(item.first, item.second)
+                    }
+
+                    updateChatControls()
+                    scrollToBottom()
+                }
+            },
+
+            onError = { error ->
+
+                isGenerating = false
+
+                if (chatHistory.isNotEmpty() &&
+                    chatHistory.last().first == "Элис думает..."
+                ) {
+                    chatHistory.removeAt(chatHistory.lastIndex)
+                }
+
+                val errorText =
+                    "Ошибка генерации ответа:\n$error"
+
+                chatHistory.add(Pair(errorText, false))
+
+                if (isChatOpen) {
+
+                    messagesLayout.removeAllViews()
+
+                    for (item in chatHistory) {
+                        addBubble(item.first, item.second)
+                    }
+
+                    updateChatControls()
+                    scrollToBottom()
+                }
+            }
+        )
     }
 
     // ОТОБРАЖЕНИЕ СООБЩЕНИЙ
