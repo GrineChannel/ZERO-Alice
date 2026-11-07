@@ -12,7 +12,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.content.res.ColorStateList
 import android.widget.Toast
 
 class MainActivity : Activity() {
@@ -27,7 +26,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val scroll = ScrollView(this).apply {
-            fillViewport = true
+            setFillViewport(true)
             setBackgroundColor(navy)
             isVerticalScrollBarEnabled = false
         }
@@ -41,21 +40,14 @@ class MainActivity : Activity() {
 
         scroll.addView(
             root,
-            ScrollView.LayoutParams(
+            ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
 
-        root.addView(
-            makeText("ZERO", 32f, silver, true),
-            fullWidth()
-        )
-
-        root.addView(
-            makeText("ZERO PROJECT", 12f, muted),
-            fullWidth()
-        )
+        root.addView(makeText("ZERO", 32f, silver, true), fullWidth())
+        root.addView(makeText("ZERO PROJECT", 12f, muted), fullWidth())
 
         addSpace(root, 35)
 
@@ -76,11 +68,7 @@ class MainActivity : Activity() {
 
         addSpace(root, 24)
 
-        root.addView(
-            makeText("ALICE", 32f, silver, true),
-            fullWidth()
-        )
-
+        root.addView(makeText("ALICE", 32f, silver, true), fullWidth())
         root.addView(
             makeText("ТВОЙ ЦИФРОВОЙ НАПАРНИК", 12f, muted),
             fullWidth()
@@ -154,7 +142,9 @@ class MainActivity : Activity() {
             minHeight = 64
             minimumHeight = 64
             stateListAnimator = null
-            backgroundTintList = ColorStateList.valueOf(panel)
+            backgroundTintList =
+                android.content.res.ColorStateList.valueOf(panel)
+
             setPadding(16, 12, 16, 12)
             setOnClickListener { action() }
 
@@ -189,10 +179,8 @@ class MainActivity : Activity() {
         layout: LinearLayout,
         height: Int
     ) {
-        val space = TextView(this)
-
         layout.addView(
-            space,
+            TextView(this),
             LinearLayout.LayoutParams(1, height)
         )
     }
