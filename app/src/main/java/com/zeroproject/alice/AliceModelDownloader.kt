@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.StatFs
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -26,23 +27,14 @@ class AliceModelDownloader(context: Context) {
     }
 
     interface Listener {
-        fun onProgress(
-            downloaded: Long,
-            total: Long,
-            percent: Int
-        )
-
+        fun onProgress(downloaded: Long, total: Long, percent: Int)
         fun onComplete(file: File)
-
         fun onError(message: String)
-
         fun onCancelled()
     }
 
     private val appContext = context.applicationContext
-
     private val executor = Executors.newSingleThreadExecutor()
-
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val modelFile =
@@ -60,14 +52,12 @@ class AliceModelDownloader(context: Context) {
     fun getModelFile(): File = modelFile
 
     fun isModelDownloaded(): Boolean {
-        return modelFile.exists() &&
-            modelFile.isFile &&
-            modelFile.length() > 0
+        return modelFile.isFile && modelFile.length() > 0
     }
 
     fun start(listener: Listener) {
         if (executor.isShutdown) {
-            listenerError(listener, "Загрузчик уже закрыт")
+            listenerError(listener, "Загрузчик закрыт")
             return
         }
 
@@ -95,7 +85,6 @@ class AliceModelDownloader(context: Context) {
                     listenerComplete(listener, modelFile)
                     return
                 }
-
                 modelFile.delete()
             }
 
@@ -103,24 +92,26 @@ class AliceModelDownloader(context: Context) {
                 if (partialFile.exists()) partialFile.length()
                 else 0L
 
-            val url = URL(MODEL_URL)
-
             val conn =
-                (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 30000
-                    readTimeout = 60000
-                    instanceFollowRedirects = true
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "ZERO-Alice-Android")
-                    if (existingBytes > 0) {
-                        setRequestProperty(
-                            "Range",
-                            "bytes=$existingBytes-"
-                        )
-                    }
-                }
+                (URL(MODEL_URL).openConnection() as HttpURLConnection)
 
             connection = conn
+
+            conn.connectTimeout = 30000
+            conn.readTimeout = 60000
+            conn.instanceFollowRedirects = true
+            conn.requestMethod = "GET"
+            conn.setRequestProperty(
+                "User-Agent",
+                "ZERO-Alice-Android"
+            )
+
+            if (existingBytes > 0) {
+                conn.setRequestProperty(
+                    "Range",
+                    "bytes=$existingBytes-"
+                )
+            }
 
             conn.connect()
 
@@ -129,110 +120,92 @@ class AliceModelDownloader(context: Context) {
                 return
             }
 
-            val responseCode = conn.responseCode
-
             val append: Boolean
             val totalBytes: Long
 
-            when (responseCode) {
+            when (conn.responseCode) {
                 HttpURLConnection.HTTP_PARTIAL -> {
                     append = true
 
-                    val contentRange =
-                        conn.getHeaderField("Content-Range")
-
                     totalBytes =
-                        contentRange
+                        conn.getHeaderField("Content-Range")
                             ?.substringAfter("/")
                             ?.toLongOrNull()
                             ?: throw Exception(
-                                "Сервер не сообщил полный размер файла"
+                                "Не удалось определить размер файла"
                             )
                 }
 
                 HttpURLConnection.HTTP_OK -> {
                     append = false
                     totalBytes = conn.contentLengthLong
+
                     if (existingBytes > 0) {
                         partialFile.delete()
                     }
                 }
 
-                else -> {
-                    throw Exception(
-                        "Ошибка сервера: HTTP $responseCode"
-                    )
-                }
+                else -> throw Exception(
+                    "Ошибка сервера: HTTP ${conn.responseCode}"
+                )
             }
 
             if (totalBytes <= 0) {
-                throw Exception("Не удалось определить размер модели")
+                throw Exception("Некорректный размер модели")
             }
 
-            val remainingBytes =
-                totalBytes -
-                    if (append) existingBytes else 0L
+            val currentBytes =
+                if (append) existingBytes else 0L
+
+            if (currentBytes > totalBytes) {
+                throw Exception("Некорректный размер частичного файла")
+            }
+
+            val requiredBytes = totalBytes - currentBytes
 
             val availableBytes =
                 StatFs(appContext.filesDir.path).availableBytes
 
-            if (availableBytes < remainingBytes + 100L * 1024L * 1024L) {
-                throw Exception(
-                    "Недостаточно свободного места для загрузки"
-                )
+            if (availableBytes < requiredBytes +
+                100L * 1024L * 1024L
+            ) {
+                throw Exception("Недостаточно свободного места")
             }
 
-            var downloaded =
-                if (append) existingBytes else 0L
-
+            var downloaded = currentBytes
             val buffer = ByteArray(BUFFER_SIZE)
 
             conn.inputStream.use { input ->
-                partialFile.outputStream()
-                    .buffered()
-                    .use { output ->
+                FileOutputStream(partialFile, append).use { output ->
 
-                        if (append) {
-                            output.close()
-                            partialFile.appendBytes(byteArrayOf())
+                    while (true) {
+                        if (cancelled) {
+                            listenerCancelled(listener)
+                            return
                         }
 
-                        val fileOutput =
-                            if (append) {
-                                partialFile.appendOutputStream()
-                            } else {
-                                partialFile.outputStream()
-                            }
+                        val count = input.read(buffer)
 
-                        fileOutput.buffered().use { stream ->
-                            while (true) {
-                                if (cancelled) {
-                                    listenerCancelled(listener)
-                                    return
-                                }
+                        if (count == -1) break
 
-                                val count = input.read(buffer)
+                        output.write(buffer, 0, count)
+                        downloaded += count
 
-                                if (count == -1) break
+                        val percent =
+                            ((downloaded * 100) / totalBytes)
+                                .toInt()
+                                .coerceIn(0, 100)
 
-                                stream.write(buffer, 0, count)
-
-                                downloaded += count
-
-                                val percent =
-                                    ((downloaded * 100) / totalBytes)
-                                        .toInt()
-                                        .coerceIn(0, 100)
-
-                                listenerProgress(
-                                    listener,
-                                    downloaded,
-                                    totalBytes,
-                                    percent
-                                )
-                            }
-                        }
+                        listenerProgress(
+                            listener,
+                            downloaded,
+                            totalBytes,
+                            percent
+                        )
                     }
+
+                    output.flush()
+                }
             }
 
             if (cancelled) {
@@ -240,16 +213,14 @@ class AliceModelDownloader(context: Context) {
                 return
             }
 
-            if (!partialFile.exists() ||
-                partialFile.length() != totalBytes
-            ) {
-                throw Exception("Размер загруженного файла не совпадает")
+            if (partialFile.length() != totalBytes) {
+                throw Exception("Размер файла не совпадает")
             }
 
             if (!verifyModel(partialFile)) {
                 partialFile.delete()
                 throw Exception(
-                    "Проверка SHA-256 не пройдена. Файл повреждён."
+                    "Проверка SHA-256 не пройдена"
                 )
             }
 
@@ -269,7 +240,7 @@ class AliceModelDownloader(context: Context) {
             } else {
                 listenerError(
                     listener,
-                    e.message ?: "Неизвестная ошибка загрузки"
+                    e.message ?: "Ошибка загрузки"
                 )
             }
         } finally {
@@ -287,17 +258,15 @@ class AliceModelDownloader(context: Context) {
             while (true) {
                 val count = input.read(buffer)
                 if (count == -1) break
-
                 digest.update(buffer, 0, count)
             }
         }
 
-        val actualHash =
-            digest.digest().joinToString("") {
-                "%02x".format(it)
-            }
+        val hash = digest.digest().joinToString("") {
+            "%02x".format(it)
+        }
 
-        return actualHash.equals(
+        return hash.equals(
             EXPECTED_SHA256,
             ignoreCase = true
         )
