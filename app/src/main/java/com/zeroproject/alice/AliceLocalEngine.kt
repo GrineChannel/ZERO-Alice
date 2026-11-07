@@ -1,4 +1,3 @@
-
 package com.zeroproject.alice
 
 import android.content.Context
@@ -35,7 +34,7 @@ class AliceLocalEngine(context: Context) {
         "models/gemma-4-E2B-it.litertlm"
     )
 
-    // ИНИЦИАЛИЗАЦИЯ ЛОКАЛЬНОЙ МОДЕЛИ
+    // ИНИЦИАЛИЗАЦИЯ МОДЕЛИ
 
     fun initialize(
         onReady: () -> Unit,
@@ -96,7 +95,7 @@ class AliceLocalEngine(context: Context) {
         }
     }
 
-    // ОТПРАВКА СООБЩЕНИЯ МОДЕЛИ
+    // ОТПРАВКА СООБЩЕНИЯ
 
     fun sendMessage(
         text: String,
@@ -115,7 +114,7 @@ class AliceLocalEngine(context: Context) {
                 val response = conversation!!.sendMessage(text)
 
                 mainHandler.post {
-                    onResponse(response.text)
+                    onResponse(response.toString())
                 }
 
             } catch (error: Throwable) {
