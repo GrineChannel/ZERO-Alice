@@ -9,8 +9,6 @@ class AliceMemoryCommands(
         val message = text.trim()
         val lower = message.lowercase()
 
-        // Просмотр долговременной памяти.
-
         if (
             lower == "что ты помнишь обо мне?" ||
             lower == "что ты помнишь?" ||
@@ -21,8 +19,6 @@ class AliceMemoryCommands(
             return showMemory()
         }
 
-        // Полная очистка памяти.
-
         if (
             lower.startsWith("забудь всё") ||
             lower.startsWith("забудь все") ||
@@ -32,16 +28,12 @@ class AliceMemoryCommands(
             return "Хорошо. Я очистила свою долговременную память. ❤️"
         }
 
-        // Удаление отдельных фактов.
-
         if (
             lower.startsWith("забудь ") ||
             lower.startsWith("удали из памяти ")
         ) {
             return forgetFact(message)
         }
-
-        // Сохранение новых фактов.
 
         val prefixes = listOf(
             "запомни, что ",
@@ -66,7 +58,6 @@ class AliceMemoryCommands(
         }
 
         val (key, value) = createFact(statement)
-
         val result = memory.saveFact(key, value)
 
         return if (result != -1L) {
@@ -76,25 +67,17 @@ class AliceMemoryCommands(
         }
     }
 
-    // Определение категории факта.
-
     private fun createFact(statement: String): Pair<String, String> {
 
         val patterns = listOf(
-            Regex(
-                "^меня зовут\\s+(.+)$",
-                RegexOption.IGNORE_CASE
-            ) to "Имя пользователя",
+            Regex("^меня зовут\\s+(.+)$", RegexOption.IGNORE_CASE)
+                to "Имя пользователя",
 
-            Regex(
-                "^я живу в\\s+(.+)$",
-                RegexOption.IGNORE_CASE
-            ) to "Место проживания",
+            Regex("^я живу в\\s+(.+)$", RegexOption.IGNORE_CASE)
+                to "Место проживания",
 
-            Regex(
-                "^мне\\s+(\\d+)\\s+лет$",
-                RegexOption.IGNORE_CASE
-            ) to "Возраст пользователя"
+            Regex("^мне\\s+(\\d+)\\s+лет$", RegexOption.IGNORE_CASE)
+                to "Возраст пользователя"
         )
 
         for ((pattern, key) in patterns) {
@@ -115,13 +98,8 @@ class AliceMemoryCommands(
                 myFact.groupValues[2].trim()
         }
 
-        val key = "Факт: " +
-            statement.lowercase().take(80)
-
-        return key to statement
+        return "Факт: ${statement.lowercase().take(80)}" to statement
     }
-
-    // Просмотр сохранённых фактов.
 
     private fun showMemory(): String {
         val facts = memory.getFacts()
@@ -138,8 +116,6 @@ class AliceMemoryCommands(
         return "Вот что хранится в моей памяти:\n\n$result"
     }
 
-    // Удаление фактов с учётом альтернативных формулировок.
-
     private fun forgetFact(message: String): String {
 
         val query = message
@@ -152,39 +128,34 @@ class AliceMemoryCommands(
                 ""
             )
             .trim()
-            .trimEnd('.', '!', '?')
+            .trim(',', '.', ':', ';', '!', '?', '—', '-')
             .lowercase()
 
         if (query.isBlank()) {
             return "Уточни, что именно мне нужно забыть."
         }
 
-        // Альтернативные названия категорий.
-
         val aliases = mapOf(
-            "где я живу" to listOf("место проживания"),
-            "мой город" to listOf("место проживания"),
-            "город" to listOf("место проживания"),
-            "место проживания" to listOf("место проживания"),
+            "где я живу" to "место проживания",
+            "мой город" to "место проживания",
+            "город" to "место проживания",
+            "место проживания" to "место проживания",
 
-            "мой возраст" to listOf("возраст пользователя"),
-            "сколько мне лет" to listOf("возраст пользователя"),
-            "возраст" to listOf("возраст пользователя"),
+            "мой возраст" to "возраст пользователя",
+            "сколько мне лет" to "возраст пользователя",
+            "возраст" to "возраст пользователя",
 
-            "как меня зовут" to listOf("имя пользователя"),
-            "моё имя" to listOf("имя пользователя"),
-            "мое имя" to listOf("имя пользователя"),
-            "имя" to listOf("имя пользователя")
+            "как меня зовут" to "имя пользователя",
+            "моё имя" to "имя пользователя",
+            "мое имя" to "имя пользователя",
+            "имя" to "имя пользователя"
         )
 
-        val searchTerms = aliases[query] ?: listOf(query)
+        val searchTerm = aliases[query] ?: query
 
         val matches = memory.getFacts().filter { fact ->
-
-            searchTerms.any { term ->
-                fact.key.lowercase().contains(term) ||
-                fact.value.lowercase().contains(term)
-            }
+            fact.key.contains(searchTerm, ignoreCase = true) ||
+            fact.value.contains(searchTerm, ignoreCase = true)
         }
 
         if (matches.isEmpty()) {
@@ -195,10 +166,6 @@ class AliceMemoryCommands(
             memory.deleteFact(fact.id)
         }
 
-        return if (matches.size == 1) {
-            "Хорошо. Я забыла эту информацию. ❤️"
-        } else {
-            "Хорошо. Я удалила ${matches.size} записей из памяти. ❤️"
-        }
+        return "Хорошо. Я забыла эту информацию. ❤️"
     }
 }
