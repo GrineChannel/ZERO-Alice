@@ -1,170 +1,171 @@
 
 package com.zeroproject.alice.memory
 
-import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
-import android.content.ContentValues
+class AliceMemoryCommands(
+    private val memory: AliceMemory
+) {
 
-data class AliceMessage(
-    val id: Long,
-    val role: String,
-    val content: String,
-    val timestamp: Long
-)
+    fun handle(text: String): String? {
+        val message = text.trim()
+        val lower = message.lowercase()
 
-data class AliceFact(
-    val id: Long,
-    val key: String,
-    val value: String,
-    val timestamp: Long
-)
-
-class AliceMemory(context: Context) {
-
-    private val helper = MemoryDatabase(context.applicationContext)
-
-    fun saveMessage(role: String, content: String): Long {
-        if (role.isBlank() || content.isBlank()) return -1
-
-        val values = ContentValues().apply {
-            put("role", role)
-            put("content", content)
-            put("timestamp", System.currentTimeMillis())
-        }
-
-        return helper.writableDatabase.insert(
-            "messages", null, values
-        )
-    }
-
-    fun getMessages(limit: Int = 500): List<AliceMessage> {
-        val result = mutableListOf<AliceMessage>()
-
-        val cursor = helper.readableDatabase.query(
-            "messages",
-            null,
-            null,
-            null,
-            null,
-            null,
-            "id ASC",
-            limit.coerceIn(1, 5000).toString()
-        )
-
-        cursor.use {
-            while (it.moveToNext()) {
-                result.add(
-                    AliceMessage(
-                        id = it.getLong(it.getColumnIndexOrThrow("id")),
-                        role = it.getString(it.getColumnIndexOrThrow("role")),
-                        content = it.getString(it.getColumnIndexOrThrow("content")),
-                        timestamp = it.getLong(it.getColumnIndexOrThrow("timestamp"))
-                    )
-                )
-            }
-        }
-
-        return result
-    }
-
-    fun clearHistory() {
-        helper.writableDatabase.delete("messages", null, null)
-    }
-
-    fun saveFact(key: String, value: String): Long {
-        if (key.isBlank() || value.isBlank()) return -1
-
-        val values = ContentValues().apply {
-            put("fact_key", key)
-            put("fact_value", value)
-            put("timestamp", System.currentTimeMillis())
-        }
-
-        return helper.writableDatabase.insertWithOnConflict(
-            "facts",
-            null,
-            values,
-            SQLiteDatabase.CONFLICT_REPLACE
-        )
-    }
-
-    fun getFacts(): List<AliceFact> {
-        val result = mutableListOf<AliceFact>()
-
-        val cursor = helper.readableDatabase.query(
-            "facts",
-            null,
-            null,
-            null,
-            null,
-            null,
-            "id ASC"
-        )
-
-        cursor.use {
-            while (it.moveToNext()) {
-                result.add(
-                    AliceFact(
-                        id = it.getLong(it.getColumnIndexOrThrow("id")),
-                        key = it.getString(it.getColumnIndexOrThrow("fact_key")),
-                        value = it.getString(it.getColumnIndexOrThrow("fact_value")),
-                        timestamp = it.getLong(it.getColumnIndexOrThrow("timestamp"))
-                    )
-                )
-            }
-        }
-
-        return result
-    }
-
-    fun deleteFact(id: Long) {
-        helper.writableDatabase.delete(
-            "facts", "id = ?", arrayOf(id.toString())
-        )
-    }
-
-    fun clearFacts() {
-        helper.writableDatabase.delete("facts", null, null)
-    }
-
-    fun close() {
-        helper.close()
-    }
-
-    private class MemoryDatabase(context: Context) :
-        SQLiteOpenHelper(context, "alice_memory.db", null, 1) {
-
-        override fun onCreate(db: SQLiteDatabase) {
-            db.execSQL(
-                """
-                CREATE TABLE messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    timestamp INTEGER NOT NULL
-                )
-                """.trimIndent()
-            )
-
-            db.execSQL(
-                """
-                CREATE TABLE facts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    fact_key TEXT NOT NULL UNIQUE,
-                    fact_value TEXT NOT NULL,
-                    timestamp INTEGER NOT NULL
-                )
-                """.trimIndent()
-            )
-        }
-
-        override fun onUpgrade(
-            db: SQLiteDatabase,
-            oldVersion: Int,
-            newVersion: Int
+        if (
+            lower == "что ты помнишь обо мне?" ||
+            lower == "что ты помнишь?" ||
+            lower == "покажи память" ||
+            lower == "покажи, что ты помнишь" ||
+            lower == "что ты знаешь обо мне?"
         ) {
-            // Миграции базы данных добавим при изменении схемы.
+            return showMemory()
         }
+
+        if (
+            lower.startsWith("забудь всё") ||
+            lower.startsWith("забудь все") ||
+            lower.startsWith("очисти память")
+        ) {
+            memory.clearFacts()
+            return "Хорошо. Я очистила свою долговременную память. ❤️"
+        }
+
+        if (
+            lower.startsWith("забудь ") ||
+            lower.startsWith("удали из памяти ")
+        ) {
+            return forgetFact(message)
+        }
+
+        val prefixes = listOf(
+            "запомни, что ",
+            "запомни что ",
+            "сохрани, что ",
+            "сохрани что ",
+            "запомни: ",
+            "сохрани: "
+        )
+
+        val prefix = prefixes.firstOrNull {
+            lower.startsWith(it)
+        } ?: return null
+
+        val statement = message
+            .substring(prefix.length)
+            .trim()
+            .trimEnd('.', '!', '?')
+
+        if (statement.isBlank()) {
+            return "Что именно мне нужно запомнить?"
+        }
+
+        val (key, value) = createFact(statement)
+        val result = memory.saveFact(key, value)
+
+        return if (result != -1L) {
+            "Запомнила! ❤️\n\n$key: $value"
+        } else {
+            "Не получилось сохранить эту информацию."
+        }
+    }
+
+    private fun createFact(statement: String): Pair<String, String> {
+
+        val patterns = listOf(
+            Regex("^меня зовут\\s+(.+)$", RegexOption.IGNORE_CASE)
+                to "Имя пользователя",
+
+            Regex("^я живу в\\s+(.+)$", RegexOption.IGNORE_CASE)
+                to "Место проживания",
+
+            Regex("^мне\\s+(\\d+)\\s+лет$", RegexOption.IGNORE_CASE)
+                to "Возраст пользователя"
+        )
+
+        for ((pattern, key) in patterns) {
+            val match = pattern.find(statement)
+
+            if (match != null) {
+                return key to match.groupValues[1].trim()
+            }
+        }
+
+        val myFact = Regex(
+            "^мой\\s+(.+?)\\s+(?:это|—|-)\\s+(.+)$",
+            RegexOption.IGNORE_CASE
+        ).find(statement)
+
+        if (myFact != null) {
+            return "Мой ${myFact.groupValues[1].trim()}" to
+                myFact.groupValues[2].trim()
+        }
+
+        return "Факт: ${statement.lowercase().take(80)}" to statement
+    }
+
+    private fun showMemory(): String {
+        val facts = memory.getFacts()
+
+        if (facts.isEmpty()) {
+            return "Пока моя долговременная память пуста. " +
+                "Можешь попросить меня что-нибудь запомнить."
+        }
+
+        val result = facts.joinToString("\n\n") {
+            "• ${it.key}: ${it.value}"
+        }
+
+        return "Вот что хранится в моей памяти:\n\n$result"
+    }
+
+    private fun forgetFact(message: String): String {
+
+        val query = message
+            .replaceFirst(
+                Regex("^забудь\\s+", RegexOption.IGNORE_CASE),
+                ""
+            )
+            .replaceFirst(
+                Regex("^удали из памяти\\s+", RegexOption.IGNORE_CASE),
+                ""
+            )
+            .trim()
+            .trim(',', '.', ':', ';', '!', '?', '—', '-')
+            .lowercase()
+
+        if (query.isBlank()) {
+            return "Уточни, что именно мне нужно забыть."
+        }
+
+        val aliases = mapOf(
+            "где я живу" to "место проживания",
+            "мой город" to "место проживания",
+            "город" to "место проживания",
+            "место проживания" to "место проживания",
+
+            "мой возраст" to "возраст пользователя",
+            "сколько мне лет" to "возраст пользователя",
+            "возраст" to "возраст пользователя",
+
+            "как меня зовут" to "имя пользователя",
+            "моё имя" to "имя пользователя",
+            "мое имя" to "имя пользователя",
+            "имя" to "имя пользователя"
+        )
+
+        val searchTerm = aliases[query] ?: query
+
+        val matches = memory.getFacts().filter { fact ->
+            fact.key.contains(searchTerm, ignoreCase = true) ||
+            fact.value.contains(searchTerm, ignoreCase = true)
+        }
+
+        if (matches.isEmpty()) {
+            return "Я не нашла в памяти информацию по запросу: $query"
+        }
+
+        matches.forEach { fact ->
+            memory.deleteFact(fact.id)
+        }
+
+        return "Хорошо. Я забыла эту информацию. ❤️"
     }
 }
