@@ -22,6 +22,7 @@ import android.widget.Toast
 
 import com.zeroproject.alice.screens.AliceHomeScreen
 import com.zeroproject.alice.screens.AliceModelScreen
+import com.zeroproject.alice.chat.AliceSelectableText
 
 import java.io.File
 
@@ -336,7 +337,6 @@ class MainActivity : Activity() {
         isModelScreenOpen = false
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-
             window.setDecorFitsSystemWindows(false)
         }
 
@@ -767,7 +767,7 @@ class MainActivity : Activity() {
         )
     }
 
-    // ОТОБРАЖЕНИЕ СООБЩЕНИЙ
+    // ОТОБРАЖЕНИЕ СООБЩЕНИЙ С ПОДДЕРЖКОЙ КОПИРОВАНИЯ
 
     private fun addBubble(text: String, isUser: Boolean) {
 
@@ -777,12 +777,22 @@ class MainActivity : Activity() {
             setPadding(0, dp(5), 0, dp(5))
         }
 
-        val bubble = TextView(this).apply {
-            this.text = text
-            textSize = 15f
-            setTextColor(silver)
+        val bubble = AliceSelectableText.create(
+            this,
+            text,
+            silver,
+            15f
+        ).apply {
+
             includeFontPadding = true
-            setPadding(dp(15), dp(12), dp(15), dp(12))
+
+            setPadding(
+                dp(15),
+                dp(12),
+                dp(15),
+                dp(12)
+            )
+
             maxWidth = dp(285)
 
             background = if (isUser) {
