@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
@@ -31,18 +32,40 @@ class MainActivity : Activity() {
 
     private val chatHistory = mutableListOf<Pair<String, Boolean>>()
 
+    private var isChatOpen = false
+
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Поднимаем интерфейс над клавиатурой
+        window.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        )
+
         showHome()
+    }
+
+    // СИСТЕМНАЯ КНОПКА НАЗАД
+
+    @Deprecated("Deprecated in Android API")
+    override fun onBackPressed() {
+        if (isChatOpen) {
+            showHome()
+        } else {
+            super.onBackPressed()
+        }
     }
 
     // ГЛАВНЫЙ ЭКРАН
 
     private fun showHome() {
+
+        isChatOpen = false
 
         val scroll = ScrollView(this).apply {
             setFillViewport(true)
@@ -140,6 +163,8 @@ class MainActivity : Activity() {
 
     private fun showChat() {
 
+        isChatOpen = true
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(navy)
@@ -198,11 +223,12 @@ class MainActivity : Activity() {
 
         addSpace(root, 12)
 
-        // Область сообщений
+        // ОБЛАСТЬ СООБЩЕНИЙ
 
         messagesScroll = ScrollView(this).apply {
             setBackgroundColor(navy)
             isVerticalScrollBarEnabled = false
+            isFillViewport = true
         }
 
         messagesLayout = LinearLayout(this).apply {
@@ -218,6 +244,9 @@ class MainActivity : Activity() {
             )
         )
 
+        // Вес 1 позволяет области сообщений уменьшаться,
+        // когда появляется клавиатура
+
         root.addView(
             messagesScroll,
             LinearLayout.LayoutParams(
@@ -229,7 +258,7 @@ class MainActivity : Activity() {
 
         addSpace(root, 10)
 
-        // Поле ввода
+        // ПОЛЕ ВВОДА И КНОПКА ОТПРАВКИ
 
         val composer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -295,7 +324,7 @@ class MainActivity : Activity() {
 
         setContentView(root)
 
-        // Восстановление переписки при возвращении в чат
+        // ПРИВЕТСТВИЕ И ИСТОРИЯ ПЕРЕПИСКИ
 
         if (chatHistory.isEmpty()) {
             chatHistory.add(
