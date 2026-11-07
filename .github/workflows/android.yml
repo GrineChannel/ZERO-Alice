@@ -33,8 +33,19 @@ jobs:
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
           yes | sdkmanager --licenses
 
+      - name: Restore signing key
+        env:
+          ALICE_KEYSTORE_BASE64: ${{ secrets.ALICE_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$ALICE_KEYSTORE_BASE64" | base64 --decode > app/alice-release.p12
+          test -s app/alice-release.p12
+
       - name: Build ZERO Alice
         uses: gradle/gradle-build-action@v3
+        env:
+          ALICE_STORE_PASSWORD: ${{ secrets.ALICE_STORE_PASSWORD }}
+          ALICE_KEY_ALIAS: ${{ secrets.ALICE_KEY_ALIAS }}
+          ALICE_KEY_PASSWORD: ${{ secrets.ALICE_KEY_PASSWORD }}
         with:
           gradle-version: 8.9
           arguments: --stacktrace assembleDebug
