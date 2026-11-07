@@ -3,11 +3,14 @@ package com.zeroproject.alice.chat
 
 import com.zeroproject.alice.AliceLocalEngine
 import com.zeroproject.alice.memory.AliceMemory
+import com.zeroproject.alice.memory.AliceMemoryCommands
 
 class AliceChatManager(
     private val engine: AliceLocalEngine,
     private val memory: AliceMemory
 ) {
+
+    private val memoryCommands = AliceMemoryCommands(memory)
 
     @Volatile
     private var contextInjected = false
@@ -31,19 +34,39 @@ class AliceChatManager(
         }
 
         return """
-            Ниже приведена история нашего предыдущего разговора.
-            Используй её для восстановления контекста и понимания
-            предыдущих сообщений.
+            ИСТОРИЯ ПРЕДЫДУЩЕГО РАЗГОВОРА:
 
-            Не отвечай на старые сообщения повторно.
-            Ответь только на новое сообщение пользователя.
-
-            ИСТОРИЯ:
             $transcript
 
             КОНЕЦ ИСТОРИИ.
-            
-            Новое сообщение пользователя:
+        """.trimIndent()
+    }
+
+    private fun buildMemoryContext(): String {
+        val facts = memory.getFacts()
+
+        if (facts.isEmpty()) return ""
+
+        val savedFacts = facts
+            .takeLast(50)
+            .joinToString("\n") {
+                "- ${it.key}: ${it.value.take(300)}"
+            }
+
+        return """
+            ДОЛГОВРЕМЕННАЯ ПАМЯТЬ:
+
+            Ниже находятся сведения, которые пользователь
+            явно попросил сохранить.
+
+            Используй их, когда они относятся к разговору.
+            Не выдумывай дополнительные факты.
+            Если сведения противоречат друг другу,
+            уточни информацию у пользователя.
+
+            $savedFacts
+
+            КОНЕЦ ДОЛГОВРЕМЕННОЙ ПАМЯТИ.
         """.trimIndent()
     }
 
@@ -52,8 +75,22 @@ class AliceChatManager(
         onResponse: (String) -> Unit,
         onError: (String) -> Unit
     ) {
+
         if (text.isBlank()) {
             onError("Сообщение не может быть пустым")
+            return
+        }
+
+        // Сначала проверяем команды памяти.
+        // Они работают даже без загруженной Gemma.
+
+        val commandResponse = memoryCommands.handle(text)
+
+        if (commandResponse != null) {
+            memory.saveMessage("user", text)
+            memory.saveMessage("assistant", commandResponse)
+
+            onResponse(commandResponse)
             return
         }
 
@@ -62,10 +99,31 @@ class AliceChatManager(
             return
         }
 
-        val prompt = if (contextInjected) {
-            text
+        val previousContext = if (contextInjected) {
+            ""
         } else {
-            buildPreviousContext() + text
+            buildPreviousContext()
+        }
+
+        // Долговременная память добавляется
+        // к каждому новому сообщению.
+
+        val factsContext = buildMemoryContext()
+
+        val prompt = buildString {
+
+            if (previousContext.isNotBlank()) {
+                append(previousContext)
+                append("\n\n")
+            }
+
+            if (factsContext.isNotBlank()) {
+                append(factsContext)
+                append("\n\n")
+            }
+
+            append("Новое сообщение пользователя:\n")
+            append(text)
         }
 
         memory.saveMessage("user", text)
@@ -74,6 +132,7 @@ class AliceChatManager(
             text = prompt,
 
             onResponse = { response ->
+
                 memory.saveMessage("assistant", response)
 
                 contextInjected = true
