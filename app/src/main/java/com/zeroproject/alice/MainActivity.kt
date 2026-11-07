@@ -220,6 +220,9 @@ class MainActivity : Activity() {
             window.setDecorFitsSystemWindows(true)
         }
 
+        val modelFile = File(filesDir, "gemma-4-E2B-it.litertlm")
+        val modelExists = modelDownloader.isModelDownloaded()
+
         val scroll = ScrollView(this).apply {
             setFillViewport(true)
             setBackgroundColor(navy)
@@ -297,10 +300,10 @@ class MainActivity : Activity() {
         addSpace(root, 10)
 
         modelStatus = makeText(
-            if (modelDownloader.isModelDownloaded()) {
-                "Файл модели найден. Проверка при запуске."
-            } else {
-                "Модель ещё не загружена"
+            when {
+                isDownloading -> "Загрузка модели продолжается..."
+                modelExists -> "Модель уже загружена!"
+                else -> "Модель ещё не загружена"
             },
             14f,
             silver
@@ -316,7 +319,7 @@ class MainActivity : Activity() {
             android.R.attr.progressBarStyleHorizontal
         ).apply {
             max = 100
-            progress = 0
+            progress = if (modelExists) 100 else 0
             progressTintList =
                 android.content.res.ColorStateList.valueOf(red)
             progressBackgroundTintList =
@@ -334,7 +337,11 @@ class MainActivity : Activity() {
         addSpace(root, 10)
 
         modelSize = makeText(
-            "0 МБ / 0 МБ",
+            if (modelExists) {
+                formatBytes(modelFile.length())
+            } else {
+                "0 МБ / 0 МБ"
+            },
             12f,
             muted
         )
@@ -343,12 +350,21 @@ class MainActivity : Activity() {
 
         addSpace(root, 25)
 
-        modelActionButton = makeButton("СКАЧАТЬ МОДЕЛЬ") {
+        modelActionButton = makeButton(
+            when {
+                isDownloading -> "ОТМЕНИТЬ ЗАГРУЗКУ"
+                modelExists -> "МОДЕЛЬ ЗАГРУЖЕНА"
+                else -> "СКАЧАТЬ МОДЕЛЬ"
+            }
+        ) {
             if (isDownloading) {
                 cancelModelDownload()
-            } else {
+            } else if (!modelDownloader.isModelDownloaded()) {
                 startModelDownload()
             }
+        }.apply {
+            isEnabled = !modelExists
+            alpha = if (modelExists) 0.65f else 1f
         }
 
         root.addView(modelActionButton!!)
@@ -381,6 +397,7 @@ class MainActivity : Activity() {
         isDownloading = true
 
         modelActionButton?.text = "ОТМЕНИТЬ ЗАГРУЗКУ"
+        modelActionButton?.isEnabled = true
         modelStatus?.text = "Подключение к серверу..."
 
         modelDownloader.start(
@@ -415,6 +432,8 @@ class MainActivity : Activity() {
                         formatBytes(file.length())
 
                     modelActionButton?.text = "МОДЕЛЬ ЗАГРУЖЕНА"
+                    modelActionButton?.isEnabled = false
+                    modelActionButton?.alpha = 0.65f
 
                     showMessage(
                         "Gemma 4 E2B успешно загружена!"
@@ -431,6 +450,9 @@ class MainActivity : Activity() {
                     modelActionButton?.text =
                         "ПОВТОРИТЬ ЗАГРУЗКУ"
 
+                    modelActionButton?.isEnabled = true
+                    modelActionButton?.alpha = 1f
+
                     showMessage(message)
                 }
 
@@ -443,6 +465,9 @@ class MainActivity : Activity() {
 
                     modelActionButton?.text =
                         "ПРОДОЛЖИТЬ ЗАГРУЗКУ"
+
+                    modelActionButton?.isEnabled = true
+                    modelActionButton?.alpha = 1f
                 }
             }
         )
@@ -552,6 +577,7 @@ class MainActivity : Activity() {
         }
 
         titleBox.addView(makeText("ALICE", 20f, silver, true))
+
         titleBox.addView(
             makeText("●  ДЕМОНСТРАЦИОННЫЙ РЕЖИМ", 10f, red)
         )
@@ -808,6 +834,7 @@ class MainActivity : Activity() {
                 android.content.res.ColorStateList.valueOf(panel)
 
             setPadding(dp(16), dp(12), dp(16), dp(12))
+
             setOnClickListener {
                 action()
             }
