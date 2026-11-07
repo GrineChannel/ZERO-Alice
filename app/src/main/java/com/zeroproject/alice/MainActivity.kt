@@ -22,6 +22,10 @@ class MainActivity : Activity() {
     private val silver = Color.rgb(198, 205, 216)
     private val muted = Color.rgb(145, 158, 180)
 
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -34,51 +38,65 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(24, 36, 24, 32)
+            setPadding(dp(24), dp(32), dp(24), dp(32))
             setBackgroundColor(navy)
         }
 
         scroll.addView(
             root,
-            ViewGroup.LayoutParams(
+            ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
 
-        root.addView(makeText("ZERO", 32f, silver, true), fullWidth())
-        root.addView(makeText("ZERO PROJECT", 12f, muted), fullWidth())
+        val logoPanel = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.VERTICAL
+            background = rounded(panel, red, 1, 16)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+
+        val logo = makeText("ZERO", 42f, silver, true)
+        logoPanel.addView(logo)
+
+        val studio = makeText("ZERO PROJECT", 12f, muted)
+        logoPanel.addView(studio)
+
+        root.addView(
+            logoPanel,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(105)
+            )
+        )
 
         addSpace(root, 35)
 
         val avatar = TextView(this).apply {
             text = "A"
-            textSize = 76f
+            textSize = 90f
             includeFontPadding = true
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(red)
-            background = rounded(panel, red, 3, 28)
+            background = rounded(panel, red, 2, 28)
         }
 
         root.addView(
             avatar,
-            LinearLayout.LayoutParams(190, 190)
+            LinearLayout.LayoutParams(dp(200), dp(200))
         )
 
         addSpace(root, 24)
 
-        root.addView(makeText("ALICE", 32f, silver, true), fullWidth())
-        root.addView(
-            makeText("ТВОЙ ЦИФРОВОЙ НАПАРНИК", 12f, muted),
-            fullWidth()
-        )
+        root.addView(makeText("ALICE", 34f, silver, true))
+        root.addView(makeText("ТВОЙ ЦИФРОВОЙ НАПАРНИК", 12f, muted))
 
         addSpace(root, 16)
 
         root.addView(
-            makeText("●  СИСТЕМА АКТИВНА", 14f, red, true),
-            fullWidth()
+            makeText("●  СИСТЕМА АКТИВНА", 14f, red, true)
         )
 
         addSpace(root, 35)
@@ -101,10 +119,7 @@ class MainActivity : Activity() {
 
         addSpace(root, 35)
 
-        root.addView(
-            makeText("ZERO PROJECT • 2026", 11f, muted),
-            fullWidth()
-        )
+        root.addView(makeText("ZERO PROJECT • 2026", 11f, muted))
 
         setContentView(scroll)
     }
@@ -134,23 +149,23 @@ class MainActivity : Activity() {
     ): Button {
         return Button(this).apply {
             text = label
-            textSize = 15f
+            textSize = 16f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(silver)
             gravity = Gravity.CENTER
             isAllCaps = false
-            minHeight = 64
-            minimumHeight = 64
+            minHeight = dp(68)
+            minimumHeight = dp(68)
             stateListAnimator = null
             backgroundTintList =
                 android.content.res.ColorStateList.valueOf(panel)
 
-            setPadding(16, 12, 16, 12)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             setOnClickListener { action() }
 
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                64
+                dp(68)
             )
         }
     }
@@ -163,16 +178,9 @@ class MainActivity : Activity() {
     ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
-            setCornerRadius(radius.toFloat())
-            setStroke(strokeWidth, strokeColor)
+            setCornerRadius(dp(radius).toFloat())
+            setStroke(dp(strokeWidth), strokeColor)
         }
-    }
-
-    private fun fullWidth(): LinearLayout.LayoutParams {
-        return LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
     }
 
     private fun addSpace(
@@ -181,7 +189,7 @@ class MainActivity : Activity() {
     ) {
         layout.addView(
             TextView(this),
-            LinearLayout.LayoutParams(1, height)
+            LinearLayout.LayoutParams(1, dp(height))
         )
     }
 
