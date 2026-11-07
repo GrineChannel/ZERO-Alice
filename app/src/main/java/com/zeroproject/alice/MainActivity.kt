@@ -7,24 +7,23 @@ import android.graphics.Color
 import android.os.Build
 import android.view.WindowManager
 import android.widget.Toast
-import android.widget.TextView
 
 import com.zeroproject.alice.screens.AliceHomeScreen
 import com.zeroproject.alice.screens.AliceModelScreen
 import com.zeroproject.alice.screens.AliceChatScreen
 
+import com.zeroproject.alice.memory.AliceMemory
+import com.zeroproject.alice.chat.AliceChatManager
+
 import java.io.File
 
 class MainActivity : Activity() {
 
-    private val navy = Color.rgb(11, 20, 38)
-    private val panel = Color.rgb(27, 42, 66)
-    private val red = Color.rgb(217, 54, 79)
-    private val silver = Color.rgb(198, 205, 216)
-    private val muted = Color.rgb(145, 158, 180)
-
     private lateinit var modelDownloader: AliceModelDownloader
     private lateinit var localEngine: AliceLocalEngine
+
+    private lateinit var aliceMemory: AliceMemory
+    private lateinit var chatManager: AliceChatManager
 
     private var modelScreen: AliceModelScreen? = null
     private var chatScreen: AliceChatScreen? = null
@@ -47,6 +46,12 @@ class MainActivity : Activity() {
         modelDownloader = AliceModelDownloader(this)
         localEngine = AliceLocalEngine(this)
 
+        aliceMemory = AliceMemory(this)
+        chatManager = AliceChatManager(
+            localEngine,
+            aliceMemory
+        )
+
         window.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
@@ -63,6 +68,10 @@ class MainActivity : Activity() {
 
         if (::localEngine.isInitialized) {
             localEngine.close()
+        }
+
+        if (::aliceMemory.isInitialized) {
+            aliceMemory.close()
         }
 
         super.onDestroy()
@@ -99,6 +108,7 @@ class MainActivity : Activity() {
 
         isChatOpen = false
         isModelScreenOpen = false
+
         chatScreen = null
         modelScreen = null
 
@@ -156,6 +166,7 @@ class MainActivity : Activity() {
             context = this,
             isModelDownloaded = modelExists,
             isDownloading = isDownloading,
+
             modelSize = if (modelExists) {
                 formatBytes(modelFile.length())
             } else {
@@ -323,21 +334,44 @@ class MainActivity : Activity() {
             window.setDecorFitsSystemWindows(false)
         }
 
+        // Восстанавливаем историю из SQLite
+
         if (chatHistory.isEmpty()) {
 
-            chatHistory.add(
-                Pair(
-                    "Привет! Я Элис. ❤️\n\nЯ запускаю свой локальный ИИ. Немного терпения!",
-                    false
+            val savedMessages = chatManager.getHistory()
+
+            if (savedMessages.isNotEmpty()) {
+
+                for (message in savedMessages) {
+
+                    chatHistory.add(
+                        Pair(
+                            message.content,
+                            message.role == "user"
+                        )
+                    )
+                }
+
+            } else {
+
+                chatHistory.add(
+                    Pair(
+                        "Привет! Я Элис. ❤️\n\nЯ запускаю свой локальный ИИ. Немного терпения!",
+                        false
+                    )
                 )
-            )
+            }
         }
 
         val screen = AliceChatScreen(
             context = this,
+
             initialMessages = chatHistory,
+
             initialStatus = getAIStatusText(),
-            initialSendEnabled = localEngine.isReady() && !isGenerating,
+
+            initialSendEnabled =
+                localEngine.isReady() && !isGenerating,
 
             onBackClick = {
                 showHome()
@@ -371,7 +405,9 @@ class MainActivity : Activity() {
 
         if (!isChatOpen) return
 
-        chatScreen?.updateStatus(getAIStatusText())
+        chatScreen?.updateStatus(
+            getAIStatusText()
+        )
 
         chatScreen?.setSendEnabled(
             localEngine.isReady() && !isGenerating
@@ -443,7 +479,11 @@ class MainActivity : Activity() {
 
                 if (isChatOpen) {
                     chatScreen?.addMessage(text, false)
-                    chatScreen?.updateStatus("●  ОШИБКА ЗАПУСКА ИИ")
+
+                    chatScreen?.updateStatus(
+                        "●  ОШИБКА ЗАПУСКА ИИ"
+                    )
+
                     updateChatControls()
                 }
 
@@ -452,7 +492,7 @@ class MainActivity : Activity() {
         )
     }
 
-    // ОТПРАВКА СООБЩЕНИЯ В GEMMA
+    // ОТПРАВКА СООБЩЕНИЯ ЧЕРЕЗ CHAT MANAGER
 
     private fun sendMessage(message: String) {
 
@@ -469,8 +509,12 @@ class MainActivity : Activity() {
 
         if (isGenerating) return
 
+        // Показываем сообщение пользователя
+
         chatHistory.add(Pair(message, true))
         chatScreen?.addMessage(message, true)
+
+        // Показываем индикатор генерации
 
         isGenerating = true
 
@@ -478,11 +522,17 @@ class MainActivity : Activity() {
             Pair("Элис думает...", false)
         )
 
-        chatScreen?.addMessage("Элис думает...", false)
+        chatScreen?.addMessage(
+            "Элис думает...",
+            false
+        )
 
         updateChatControls()
 
-        localEngine.sendMessage(
+        // Передаём сообщение менеджеру чата.
+        // Он сохраняет переписку и восстанавливает контекст.
+
+        chatManager.sendMessage(
 
             text = message,
 
