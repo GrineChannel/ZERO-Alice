@@ -21,6 +21,8 @@ import android.widget.TextView
 import android.widget.Toast
 import android.widget.ProgressBar
 
+import com.zeroproject.alice.screens.AliceHomeScreen
+
 import java.io.File
 
 class MainActivity : Activity() {
@@ -114,7 +116,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // ГЛАВНЫЙ ЭКРАН
+    // ГЛАВНЫЙ ЭКРАН — ОТДЕЛЬНЫЙ МОДУЛЬ
 
     private fun showHome() {
 
@@ -125,102 +127,31 @@ class MainActivity : Activity() {
             window.setDecorFitsSystemWindows(true)
         }
 
-        val scroll = ScrollView(this).apply {
-            setFillViewport(true)
-            setBackgroundColor(navy)
-            isVerticalScrollBarEnabled = false
-        }
+        val homeScreen = AliceHomeScreen(
+            context = this,
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(32), dp(24), dp(32))
-            setBackgroundColor(navy)
-        }
+            onChatClick = {
+                showChat()
+            },
 
-        scroll.addView(
-            root,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+            onVoiceClick = {
+                showMessage(
+                    "Голосовой модуль будет добавлен позже"
+                )
+            },
+
+            onModelClick = {
+                showModelScreen()
+            },
+
+            onSettingsClick = {
+                showMessage(
+                    "Настройки будут добавлены следующим этапом"
+                )
+            }
         )
 
-        val logoPanel = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.VERTICAL
-            background = rounded(panel, red, 1, 16)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-        }
-
-        logoPanel.addView(makeText("ZERO", 42f, silver, true))
-        logoPanel.addView(makeText("ZERO PROJECT", 12f, muted))
-
-        root.addView(
-            logoPanel,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(105)
-            )
-        )
-
-        addSpace(root, 35)
-
-        val avatar = TextView(this).apply {
-            text = "A"
-            textSize = 90f
-            includeFontPadding = true
-            gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(red)
-            background = rounded(panel, red, 2, 28)
-        }
-
-        root.addView(
-            avatar,
-            LinearLayout.LayoutParams(dp(200), dp(200))
-        )
-
-        addSpace(root, 24)
-
-        root.addView(makeText("ALICE", 34f, silver, true))
-        root.addView(makeText("ТВОЙ ЦИФРОВОЙ НАПАРНИК", 12f, muted))
-
-        addSpace(root, 16)
-
-        root.addView(
-            makeText("●  СИСТЕМА АКТИВНА", 14f, red, true)
-        )
-
-        addSpace(root, 35)
-
-        root.addView(makeButton("ОБЩЕНИЕ") {
-            showChat()
-        })
-
-        addSpace(root, 14)
-
-        root.addView(makeButton("ГОЛОС") {
-            showMessage("Голосовой модуль будет добавлен позже")
-        })
-
-        addSpace(root, 14)
-
-        root.addView(makeButton("МОДЕЛЬ ИИ") {
-            showModelScreen()
-        })
-
-        addSpace(root, 14)
-
-        root.addView(makeButton("НАСТРОЙКИ") {
-            showMessage("Настройки будут добавлены следующим этапом")
-        })
-
-        addSpace(root, 35)
-
-        root.addView(makeText("ZERO PROJECT • 2026", 11f, muted))
-
-        setContentView(scroll)
+        setContentView(homeScreen.create())
     }
 
     // ЭКРАН МОДЕЛИ ИИ
@@ -744,7 +675,6 @@ class MainActivity : Activity() {
         scrollToBottom()
         updateChatControls()
 
-        // Запускаем Gemma при первом открытии чата.
         initializeAI()
     }
 
@@ -840,6 +770,7 @@ class MainActivity : Activity() {
             onError = { error ->
 
                 isInitializingAI = false
+                engineInitializationStarted = false
 
                 if (isChatOpen) {
 
