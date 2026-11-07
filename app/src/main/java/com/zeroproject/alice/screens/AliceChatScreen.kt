@@ -18,7 +18,6 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-
 import android.text.InputType
 
 import com.zeroproject.alice.chat.AliceSelectableText
@@ -200,7 +199,7 @@ class AliceChatScreen(
         )
     }
 
-    // ПОЛЕ ВВОДА И КНОПКА ОТПРАВКИ
+    // ПОЛЕ ВВОДА
 
     private fun createComposer() {
 
@@ -212,20 +211,44 @@ class AliceChatScreen(
         }
 
         messageInput = EditText(context).apply {
+
             hint = "Напиши Элис..."
             setHintTextColor(muted)
             setTextColor(silver)
             textSize = 15f
+
             maxLines = 4
             minLines = 1
-            setPadding(dp(10), dp(8), dp(10), dp(8))
+
+            setPadding(
+                dp(10),
+                dp(8),
+                dp(10),
+                dp(8)
+            )
+
             setBackgroundColor(Color.TRANSPARENT)
 
-            imeOptions = EditorInfo.IME_ACTION_SEND
+            // Разрешаем выделение, копирование и вставку текста.
+
+            isFocusable = true
+            isFocusableInTouchMode = true
+            isLongClickable = true
+            setTextIsSelectable(false)
+
+            // Многострочный ввод.
 
             inputType =
                 InputType.TYPE_CLASS_TEXT or
-                    InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+
+            imeOptions = EditorInfo.IME_ACTION_SEND
+
+            // Не блокируем стандартное Android-контекстное меню.
+
+            customSelectionActionModeCallback = null
+            customInsertionActionModeCallback = null
 
             setOnEditorActionListener { _, actionId, _ ->
 
@@ -272,6 +295,8 @@ class AliceChatScreen(
             )
         )
     }
+
+    // ОТПРАВКА СООБЩЕНИЯ
 
     private fun sendCurrentMessage() {
 
@@ -338,7 +363,7 @@ class AliceChatScreen(
         scrollToBottom()
     }
 
-    // ПОЛНОЕ ОБНОВЛЕНИЕ ИСТОРИИ
+    // ОБНОВЛЕНИЕ ИСТОРИИ
 
     fun setMessages(messages: List<Pair<String, Boolean>>) {
 
