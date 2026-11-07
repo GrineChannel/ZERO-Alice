@@ -16,28 +16,28 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.rgb(12, 12, 18))
+            setBackgroundColor(Color.rgb(11, 20, 38))
             setPadding(32, 32, 32, 32)
         }
 
         val title = TextView(this).apply {
             text = "ZERO"
             textSize = 38f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.rgb(198, 205, 216))
             gravity = Gravity.CENTER
         }
 
         val subtitle = TextView(this).apply {
             text = "ALICE"
             textSize = 25f
-            setTextColor(Color.rgb(190, 150, 90))
+            setTextColor(Color.rgb(217, 54, 79))
             gravity = Gravity.CENTER
         }
 
         val status = TextView(this).apply {
             text = "Система инициализирована"
             textSize = 15f
-            setTextColor(Color.LTGRAY)
+            setTextColor(Color.rgb(170, 180, 194))
             gravity = Gravity.CENTER
         }
 
