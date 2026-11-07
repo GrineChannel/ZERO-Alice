@@ -6,9 +6,11 @@ import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
@@ -33,6 +35,7 @@ class MainActivity : Activity() {
     private val chatHistory = mutableListOf<Pair<String, Boolean>>()
 
     private var isChatOpen = false
+    private var lastBackPressedAt = 0L
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
@@ -41,7 +44,6 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Поднимаем интерфейс над клавиатурой
         window.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
@@ -56,8 +58,21 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         if (isChatOpen) {
             showHome()
+            return
+        }
+
+        val currentTime = System.currentTimeMillis()
+
+        if (currentTime - lastBackPressedAt < 2000) {
+            finish()
         } else {
-            super.onBackPressed()
+            lastBackPressedAt = currentTime
+
+            Toast.makeText(
+                this,
+                "Нажмите ещё раз, чтобы выйти из ZERO: Alice",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -66,6 +81,10 @@ class MainActivity : Activity() {
     private fun showHome() {
 
         isChatOpen = false
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(true)
+        }
 
         val scroll = ScrollView(this).apply {
             setFillViewport(true)
@@ -171,7 +190,37 @@ class MainActivity : Activity() {
             setPadding(dp(16), dp(12), dp(16), dp(12))
         }
 
-        // Верхняя панель
+        // УЧЁТ СИСТЕМНЫХ ПАНЕЛЕЙ И КЛАВИАТУРЫ
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+
+            window.setDecorFitsSystemWindows(false)
+
+            root.setOnApplyWindowInsetsListener { view, insets ->
+
+                val systemBars = insets.getInsets(
+                    WindowInsets.Type.systemBars()
+                )
+
+                val keyboard = insets.getInsets(
+                    WindowInsets.Type.ime()
+                )
+
+                view.setPadding(
+                    dp(16) + systemBars.left,
+                    dp(12) + systemBars.top,
+                    dp(16) + systemBars.right,
+                    dp(12) + maxOf(
+                        systemBars.bottom,
+                        keyboard.bottom
+                    )
+                )
+
+                insets
+            }
+        }
+
+        // ВЕРХНЯЯ ПАНЕЛЬ
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -187,7 +236,9 @@ class MainActivity : Activity() {
             isAllCaps = false
             backgroundTintList =
                 android.content.res.ColorStateList.valueOf(panel)
-            setOnClickListener { showHome() }
+            setOnClickListener {
+                showHome()
+            }
         }
 
         header.addView(
@@ -202,7 +253,9 @@ class MainActivity : Activity() {
         }
 
         titleBox.addView(makeText("ALICE", 20f, silver, true))
-        titleBox.addView(makeText("●  ДЕМОНСТРАЦИОННЫЙ РЕЖИМ", 10f, red))
+        titleBox.addView(
+            makeText("●  ДЕМОНСТРАЦИОННЫЙ РЕЖИМ", 10f, red)
+        )
 
         header.addView(
             titleBox,
@@ -244,9 +297,6 @@ class MainActivity : Activity() {
             )
         )
 
-        // Вес 1 позволяет области сообщений уменьшаться,
-        // когда появляется клавиатура
-
         root.addView(
             messagesScroll,
             LinearLayout.LayoutParams(
@@ -258,7 +308,7 @@ class MainActivity : Activity() {
 
         addSpace(root, 10)
 
-        // ПОЛЕ ВВОДА И КНОПКА ОТПРАВКИ
+        // ПОЛЕ ВВОДА
 
         val composer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -276,10 +326,12 @@ class MainActivity : Activity() {
             minLines = 1
             setPadding(dp(10), dp(8), dp(10), dp(8))
             setBackgroundColor(Color.TRANSPARENT)
+
             imeOptions = EditorInfo.IME_ACTION_SEND
+
             inputType =
                 android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                    android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
 
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -306,7 +358,10 @@ class MainActivity : Activity() {
             setTextColor(silver)
             isAllCaps = false
             background = rounded(red, red, 1, 12)
-            setOnClickListener { sendMessage() }
+
+            setOnClickListener {
+                sendMessage()
+            }
         }
 
         composer.addView(
@@ -323,6 +378,10 @@ class MainActivity : Activity() {
         )
 
         setContentView(root)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            root.requestApplyInsets()
+        }
 
         // ПРИВЕТСТВИЕ И ИСТОРИЯ ПЕРЕПИСКИ
 
@@ -422,6 +481,7 @@ class MainActivity : Activity() {
         color: Int,
         bold: Boolean = false
     ): TextView {
+
         return TextView(this).apply {
             text = value
             textSize = size
@@ -439,6 +499,7 @@ class MainActivity : Activity() {
         label: String,
         action: () -> Unit
     ): Button {
+
         return Button(this).apply {
             text = label
             textSize = 16f
@@ -449,11 +510,14 @@ class MainActivity : Activity() {
             minHeight = dp(68)
             minimumHeight = dp(68)
             stateListAnimator = null
+
             backgroundTintList =
                 android.content.res.ColorStateList.valueOf(panel)
 
             setPadding(dp(16), dp(12), dp(16), dp(12))
-            setOnClickListener { action() }
+            setOnClickListener {
+                action()
+            }
 
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -468,6 +532,7 @@ class MainActivity : Activity() {
         strokeWidth: Int,
         radius: Int
     ): GradientDrawable {
+
         return GradientDrawable().apply {
             setColor(color)
             setCornerRadius(dp(radius).toFloat())
@@ -479,6 +544,7 @@ class MainActivity : Activity() {
         layout: LinearLayout,
         height: Int
     ) {
+
         layout.addView(
             TextView(this),
             LinearLayout.LayoutParams(1, dp(height))
@@ -486,6 +552,10 @@ class MainActivity : Activity() {
     }
 
     private fun showMessage(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_SHORT
+        ).show()
     }
 }
