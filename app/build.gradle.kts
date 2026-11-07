@@ -1,7 +1,7 @@
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("com.android.application") version "8.7.3"
+    id("org.jetbrains.kotlin.android") version "2.0.21"
 }
 
 android {
@@ -10,6 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.zeroproject.alice"
+
         minSdk = 26
         targetSdk = 35
 
@@ -23,6 +24,10 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+        }
+
+        debug {
+            isDebuggable = true
         }
     }
 
