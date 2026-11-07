@@ -19,9 +19,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import android.widget.ProgressBar
 
 import com.zeroproject.alice.screens.AliceHomeScreen
+import com.zeroproject.alice.screens.AliceModelScreen
 
 import java.io.File
 
@@ -40,10 +40,7 @@ class MainActivity : Activity() {
     private lateinit var modelDownloader: AliceModelDownloader
     private lateinit var localEngine: AliceLocalEngine
 
-    private var modelProgress: ProgressBar? = null
-    private var modelStatus: TextView? = null
-    private var modelSize: TextView? = null
-    private var modelActionButton: Button? = null
+    private var modelScreen: AliceModelScreen? = null
 
     private var chatStatus: TextView? = null
     private var sendButton: Button? = null
@@ -116,7 +113,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // ГЛАВНЫЙ ЭКРАН — ОТДЕЛЬНЫЙ МОДУЛЬ
+    // ГЛАВНЫЙ ЭКРАН
 
     private fun showHome() {
 
@@ -165,172 +162,39 @@ class MainActivity : Activity() {
             window.setDecorFitsSystemWindows(true)
         }
 
-        val modelFile = File(filesDir, "gemma-4-E2B-it.litertlm")
+        val modelFile = File(
+            filesDir,
+            "gemma-4-E2B-it.litertlm"
+        )
+
         val modelExists = modelDownloader.isModelDownloaded()
 
-        val scroll = ScrollView(this).apply {
-            setFillViewport(true)
-            setBackgroundColor(navy)
-            isVerticalScrollBarEnabled = false
-        }
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(22), dp(24), dp(22), dp(28))
-            setBackgroundColor(navy)
-        }
-
-        scroll.addView(
-            root,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
-
-        root.addView(makeText("ЛОКАЛЬНЫЙ ИИ", 25f, silver, true))
-
-        addSpace(root, 8)
-
-        root.addView(makeText("ZERO: ALICE", 13f, red, true))
-
-        addSpace(root, 28)
-
-        val modelPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = rounded(panel, red, 1, 18)
-            setPadding(dp(18), dp(22), dp(18), dp(22))
-        }
-
-        modelPanel.addView(
-            makeText("GEMMA 4", 30f, silver, true)
-        )
-
-        addSpace(modelPanel, 6)
-
-        modelPanel.addView(
-            makeText("E2B INSTRUCT", 17f, red, true)
-        )
-
-        addSpace(modelPanel, 18)
-
-        modelPanel.addView(
-            makeText("Локальная языковая модель", 14f, silver)
-        )
-
-        modelPanel.addView(
-            makeText("Работа непосредственно на телефоне", 12f, muted)
-        )
-
-        modelPanel.addView(
-            makeText("Размер файла: около 2,59 ГБ", 13f, silver)
-        )
-
-        root.addView(
-            modelPanel,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
-
-        addSpace(root, 30)
-
-        root.addView(
-            makeText("СОСТОЯНИЕ МОДЕЛИ", 14f, muted, true)
-        )
-
-        addSpace(root, 10)
-
-        modelStatus = makeText(
-            when {
-                isDownloading -> "Загрузка модели продолжается..."
-                modelExists -> "Модель уже загружена!"
-                else -> "Модель ещё не загружена"
-            },
-            14f,
-            silver
-        )
-
-        root.addView(modelStatus!!)
-
-        addSpace(root, 18)
-
-        modelProgress = ProgressBar(
-            this,
-            null,
-            android.R.attr.progressBarStyleHorizontal
-        ).apply {
-            max = 100
-            progress = if (modelExists) 100 else 0
-            progressTintList =
-                android.content.res.ColorStateList.valueOf(red)
-            progressBackgroundTintList =
-                android.content.res.ColorStateList.valueOf(panel)
-        }
-
-        root.addView(
-            modelProgress,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(12)
-            )
-        )
-
-        addSpace(root, 10)
-
-        modelSize = makeText(
-            if (modelExists) {
+        val screen = AliceModelScreen(
+            context = this,
+            isModelDownloaded = modelExists,
+            isDownloading = isDownloading,
+            modelSize = if (modelExists) {
                 formatBytes(modelFile.length())
             } else {
                 "0 МБ / 0 МБ"
             },
-            12f,
-            muted
-        )
 
-        root.addView(modelSize!!)
-
-        addSpace(root, 25)
-
-        modelActionButton = makeButton(
-            when {
-                isDownloading -> "ОТМЕНИТЬ ЗАГРУЗКУ"
-                modelExists -> "МОДЕЛЬ ЗАГРУЖЕНА"
-                else -> "СКАЧАТЬ МОДЕЛЬ"
-            }
-        ) {
-            if (isDownloading) {
-                cancelModelDownload()
-            } else if (!modelDownloader.isModelDownloaded()) {
+            onDownloadClick = {
                 startModelDownload()
+            },
+
+            onCancelClick = {
+                cancelModelDownload()
+            },
+
+            onBackClick = {
+                showHome()
             }
-        }.apply {
-            isEnabled = !modelExists
-            alpha = if (modelExists) 0.65f else 1f
-        }
-
-        root.addView(modelActionButton!!)
-
-        addSpace(root, 16)
-
-        root.addView(
-            makeText(
-                "После загрузки файл будет сохранён во внутренней памяти приложения.",
-                12f,
-                muted
-            )
         )
 
-        addSpace(root, 25)
+        modelScreen = screen
 
-        root.addView(makeButton("НАЗАД") {
-            showHome()
-        })
-
-        setContentView(scroll)
+        setContentView(screen.create())
     }
 
     // ЗАПУСК ЗАГРУЗКИ
@@ -341,9 +205,14 @@ class MainActivity : Activity() {
 
         isDownloading = true
 
-        modelActionButton?.text = "ОТМЕНИТЬ ЗАГРУЗКУ"
-        modelActionButton?.isEnabled = true
-        modelStatus?.text = "Подключение к серверу..."
+        modelScreen?.updateAction(
+            "ОТМЕНИТЬ ЗАГРУЗКУ",
+            true
+        )
+
+        modelScreen?.updateStatus(
+            "Подключение к серверу..."
+        )
 
         modelDownloader.start(
             object : AliceModelDownloader.Listener {
@@ -353,32 +222,39 @@ class MainActivity : Activity() {
                     total: Long,
                     percent: Int
                 ) {
+
                     if (!isModelScreenOpen) return
 
-                    modelProgress?.progress = percent
+                    modelScreen?.updateProgress(percent)
 
-                    modelStatus?.text =
+                    modelScreen?.updateStatus(
                         "Загрузка модели: $percent%"
+                    )
 
-                    modelSize?.text =
+                    modelScreen?.updateSize(
                         "${formatBytes(downloaded)} / ${formatBytes(total)}"
+                    )
                 }
 
                 override fun onComplete(file: File) {
 
                     isDownloading = false
 
-                    modelProgress?.progress = 100
+                    modelScreen?.updateProgress(100)
 
-                    modelStatus?.text =
+                    modelScreen?.updateStatus(
                         "Модель успешно загружена и проверена!"
+                    )
 
-                    modelSize?.text =
+                    modelScreen?.updateSize(
                         formatBytes(file.length())
+                    )
 
-                    modelActionButton?.text = "МОДЕЛЬ ЗАГРУЖЕНА"
-                    modelActionButton?.isEnabled = false
-                    modelActionButton?.alpha = 0.65f
+                    modelScreen?.updateAction(
+                        "МОДЕЛЬ ЗАГРУЖЕНА",
+                        false,
+                        0.65f
+                    )
 
                     showMessage(
                         "Gemma 4 E2B успешно загружена!"
@@ -389,14 +265,14 @@ class MainActivity : Activity() {
 
                     isDownloading = false
 
-                    modelStatus?.text =
+                    modelScreen?.updateStatus(
                         "Ошибка загрузки: $message"
+                    )
 
-                    modelActionButton?.text =
-                        "ПОВТОРИТЬ ЗАГРУЗКУ"
-
-                    modelActionButton?.isEnabled = true
-                    modelActionButton?.alpha = 1f
+                    modelScreen?.updateAction(
+                        "ПОВТОРИТЬ ЗАГРУЗКУ",
+                        true
+                    )
 
                     showMessage(message)
                 }
@@ -405,14 +281,14 @@ class MainActivity : Activity() {
 
                     isDownloading = false
 
-                    modelStatus?.text =
+                    modelScreen?.updateStatus(
                         "Загрузка отменена. Можно продолжить позже."
+                    )
 
-                    modelActionButton?.text =
-                        "ПРОДОЛЖИТЬ ЗАГРУЗКУ"
-
-                    modelActionButton?.isEnabled = true
-                    modelActionButton?.alpha = 1f
+                    modelScreen?.updateAction(
+                        "ПРОДОЛЖИТЬ ЗАГРУЗКУ",
+                        true
+                    )
                 }
             }
         )
@@ -424,7 +300,9 @@ class MainActivity : Activity() {
 
         if (!isDownloading) return
 
-        modelStatus?.text = "Отмена загрузки..."
+        modelScreen?.updateStatus(
+            "Отмена загрузки..."
+        )
 
         modelDownloader.cancel()
     }
