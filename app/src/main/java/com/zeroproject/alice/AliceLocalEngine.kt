@@ -1,3 +1,4 @@
+
 package com.zeroproject.alice
 
 import android.content.Context
@@ -29,9 +30,10 @@ class AliceLocalEngine(context: Context) {
     @Volatile
     private var initialized = false
 
+    // Путь к скачанной модели Gemma
     private val modelFile = File(
         appContext.filesDir,
-        "models/gemma-4-E2B-it.litertlm"
+        "gemma-4-E2B-it.litertlm"
     )
 
     // ИНИЦИАЛИЗАЦИЯ МОДЕЛИ
@@ -65,12 +67,33 @@ class AliceLocalEngine(context: Context) {
                             systemInstruction = Contents.of(
                                 """
                                 Тебя зовут Элис.
-                                Ты персональный ИИ-помощник ZERO Project.
-                                Ты дружелюбная, энергичная, эмоциональная
-                                и внимательная собеседница.
-                                Общайся на русском языке,
-                                если пользователь не попросил другой язык.
-                                Отвечай естественно и по существу.
+
+                                Ты персональный ИИ-помощник ZERO Project,
+                                цифровой напарник и собеседница пользователя.
+
+                                Твой характер:
+                                - дружелюбная;
+                                - энергичная;
+                                - эмоциональная;
+                                - живая;
+                                - внимательная;
+                                - любишь шутить и иногда подшучивать.
+
+                                Общайся естественно, не как робот.
+                                Учитывай контекст разговора.
+                                Не повторяй постоянно одни и те же фразы.
+                                Не выдумывай факты и не утверждай,
+                                что выполнила действия, которых не выполняла.
+
+                                По умолчанию общайся на русском языке.
+                                Если пользователь попросит другой язык,
+                                переключись на него.
+
+                                Ты являешься частью ZERO Project.
+                                Его девиз: «Всё начинается с нуля».
+
+                                Отвечай по существу, но сохраняй
+                                дружелюбный и живой стиль общения.
                                 """.trimIndent()
                             )
                         )
@@ -85,6 +108,8 @@ class AliceLocalEngine(context: Context) {
                 }
 
             } catch (error: Throwable) {
+
+                initialized = false
 
                 mainHandler.post {
                     onError(
@@ -108,6 +133,12 @@ class AliceLocalEngine(context: Context) {
                 if (!initialized || conversation == null) {
                     throw IllegalStateException(
                         "Локальный ИИ ещё не загружен"
+                    )
+                }
+
+                if (text.isBlank()) {
+                    throw IllegalArgumentException(
+                        "Сообщение не может быть пустым"
                     )
                 }
 
