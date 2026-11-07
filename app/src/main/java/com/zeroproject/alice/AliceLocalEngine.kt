@@ -19,18 +19,22 @@ class AliceLocalEngine(context: Context) {
 
     private val appContext = context.applicationContext
 
+    // Все запросы к Gemma выполняются последовательно.
     private val executor = Executors.newSingleThreadExecutor()
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var engine: Engine? = null
 
+    // Основная беседа с пользователем.
     private var conversation: Conversation? = null
+
+    // Изолированная беседа для анализа памяти.
+    private var memoryConversation: Conversation? = null
 
     @Volatile
     private var initialized = false
 
-    // Путь к скачанной модели Gemma
     private val modelFile = File(
         appContext.filesDir,
         "gemma-4-E2B-it.litertlm"
@@ -43,6 +47,11 @@ class AliceLocalEngine(context: Context) {
         onError: (String) -> Unit
     ) {
         executor.execute {
+
+            var newEngine: Engine? = null
+            var newConversation: Conversation? = null
+            var newMemoryConversation: Conversation? = null
+
             try {
 
                 if (!modelFile.exists()) {
@@ -57,11 +66,13 @@ class AliceLocalEngine(context: Context) {
                     cacheDir = appContext.cacheDir.absolutePath
                 )
 
-                val newEngine = Engine(config)
+                newEngine = Engine(config)
 
                 newEngine.initialize()
 
-                val newConversation =
+                // Основная беседа.
+
+                newConversation =
                     newEngine.createConversation(
                         ConversationConfig(
                             systemInstruction = Contents.of(
@@ -99,8 +110,32 @@ class AliceLocalEngine(context: Context) {
                         )
                     )
 
+                // Отдельная беседа для анализа памяти.
+
+                newMemoryConversation =
+                    newEngine.createConversation(
+                        ConversationConfig(
+                            systemInstruction = Contents.of(
+                                """
+                                Ты — внутренний модуль анализа
+                                долговременной памяти Элис.
+
+                                Твоя задача — анализировать переданный
+                                диалог и извлекать полезные воспоминания.
+
+                                Не веди обычный разговор.
+                                Не обращайся к пользователю.
+                                Выполняй только инструкции
+                                полученного задания.
+                                """.trimIndent()
+                            )
+                        )
+                    )
+
                 engine = newEngine
                 conversation = newConversation
+                memoryConversation = newMemoryConversation
+
                 initialized = true
 
                 mainHandler.post {
@@ -109,7 +144,23 @@ class AliceLocalEngine(context: Context) {
 
             } catch (error: Throwable) {
 
+                try {
+                    newMemoryConversation?.close()
+                } catch (_: Throwable) {}
+
+                try {
+                    newConversation?.close()
+                } catch (_: Throwable) {}
+
+                try {
+                    newEngine?.close()
+                } catch (_: Throwable) {}
+
                 initialized = false
+
+                engine = null
+                conversation = null
+                memoryConversation = null
 
                 mainHandler.post {
                     onError(
@@ -120,14 +171,16 @@ class AliceLocalEngine(context: Context) {
         }
     }
 
-    // ОТПРАВКА СООБЩЕНИЯ
+    // ОТПРАВКА СООБЩЕНИЯ ПОЛЬЗОВАТЕЛЯ
 
     fun sendMessage(
         text: String,
         onResponse: (String) -> Unit,
         onError: (String) -> Unit
     ) {
+
         executor.execute {
+
             try {
 
                 if (!initialized || conversation == null) {
@@ -159,6 +212,49 @@ class AliceLocalEngine(context: Context) {
         }
     }
 
+    // АНАЛИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ
+
+    fun analyzeMemory(
+        prompt: String,
+        onResult: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+
+        executor.execute {
+
+            try {
+
+                if (!initialized || memoryConversation == null) {
+                    throw IllegalStateException(
+                        "Модуль анализа памяти ещё не загружен"
+                    )
+                }
+
+                if (prompt.isBlank()) {
+                    throw IllegalArgumentException(
+                        "Запрос анализа памяти пустой"
+                    )
+                }
+
+                // Запрос отправляется только в отдельную беседу.
+                val response =
+                    memoryConversation!!.sendMessage(prompt)
+
+                mainHandler.post {
+                    onResult(response.toString())
+                }
+
+            } catch (error: Throwable) {
+
+                mainHandler.post {
+                    onError(
+                        error.message ?: "Ошибка анализа памяти"
+                    )
+                }
+            }
+        }
+    }
+
     // СОСТОЯНИЕ ДВИЖКА
 
     fun isReady(): Boolean {
@@ -168,20 +264,25 @@ class AliceLocalEngine(context: Context) {
     // ОСВОБОЖДЕНИЕ РЕСУРСОВ
 
     fun close() {
+
         executor.execute {
 
             try {
+                memoryConversation?.close()
+            } catch (_: Throwable) {}
+
+            try {
                 conversation?.close()
-            } catch (_: Throwable) {
-            }
+            } catch (_: Throwable) {}
 
             try {
                 engine?.close()
-            } catch (_: Throwable) {
-            }
+            } catch (_: Throwable) {}
 
+            memoryConversation = null
             conversation = null
             engine = null
+
             initialized = false
         }
 
