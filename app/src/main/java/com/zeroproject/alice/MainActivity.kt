@@ -240,7 +240,7 @@ class MainActivity : Activity() {
 
         messageInput = EditText(this).apply {
             hint = "Напиши Элис..."
-            hintTextColor = muted
+            setHintTextColor(muted)
             setTextColor(silver)
             textSize = 15f
             maxLines = 4
