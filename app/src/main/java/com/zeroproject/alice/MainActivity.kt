@@ -19,6 +19,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ProgressBar
+
+import java.io.File
 
 class MainActivity : Activity() {
 
@@ -32,9 +35,19 @@ class MainActivity : Activity() {
     private lateinit var messagesScroll: ScrollView
     private lateinit var messageInput: EditText
 
+    private lateinit var modelDownloader: AliceModelDownloader
+
+    private var modelProgress: ProgressBar? = null
+    private var modelStatus: TextView? = null
+    private var modelSize: TextView? = null
+    private var modelActionButton: Button? = null
+
     private val chatHistory = mutableListOf<Pair<String, Boolean>>()
 
     private var isChatOpen = false
+    private var isModelScreenOpen = false
+    private var isDownloading = false
+
     private var lastBackPressedAt = 0L
 
     private fun dp(value: Int): Int {
@@ -44,6 +57,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        modelDownloader = AliceModelDownloader(this)
+
         window.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
@@ -52,11 +67,20 @@ class MainActivity : Activity() {
         showHome()
     }
 
+    override fun onDestroy() {
+        if (::modelDownloader.isInitialized) {
+            modelDownloader.close()
+        }
+
+        super.onDestroy()
+    }
+
     // СИСТЕМНАЯ КНОПКА НАЗАД
 
     @Deprecated("Deprecated in Android API")
     override fun onBackPressed() {
-        if (isChatOpen) {
+
+        if (isChatOpen || isModelScreenOpen) {
             showHome()
             return
         }
@@ -81,6 +105,7 @@ class MainActivity : Activity() {
     private fun showHome() {
 
         isChatOpen = false
+        isModelScreenOpen = false
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(true)
@@ -167,6 +192,12 @@ class MainActivity : Activity() {
 
         addSpace(root, 14)
 
+        root.addView(makeButton("МОДЕЛЬ ИИ") {
+            showModelScreen()
+        })
+
+        addSpace(root, 14)
+
         root.addView(makeButton("НАСТРОЙКИ") {
             showMessage("Настройки будут добавлены следующим этапом")
         })
@@ -178,19 +209,289 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
+    // ЭКРАН МОДЕЛИ ИИ
+
+    private fun showModelScreen() {
+
+        isChatOpen = false
+        isModelScreenOpen = true
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(true)
+        }
+
+        val scroll = ScrollView(this).apply {
+            setFillViewport(true)
+            setBackgroundColor(navy)
+            isVerticalScrollBarEnabled = false
+        }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(22), dp(24), dp(22), dp(28))
+            setBackgroundColor(navy)
+        }
+
+        scroll.addView(
+            root,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        root.addView(makeText("ЛОКАЛЬНЫЙ ИИ", 25f, silver, true))
+
+        addSpace(root, 8)
+
+        root.addView(makeText("ZERO: ALICE", 13f, red, true))
+
+        addSpace(root, 28)
+
+        val modelPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = rounded(panel, red, 1, 18)
+            setPadding(dp(18), dp(22), dp(18), dp(22))
+        }
+
+        modelPanel.addView(
+            makeText("GEMMA 4", 30f, silver, true)
+        )
+
+        addSpace(modelPanel, 6)
+
+        modelPanel.addView(
+            makeText("E2B INSTRUCT", 17f, red, true)
+        )
+
+        addSpace(modelPanel, 18)
+
+        modelPanel.addView(
+            makeText("Локальная языковая модель", 14f, silver)
+        )
+
+        modelPanel.addView(
+            makeText("Работа непосредственно на телефоне", 12f, muted)
+        )
+
+        modelPanel.addView(
+            makeText("Размер файла: около 2,59 ГБ", 13f, silver)
+        )
+
+        root.addView(
+            modelPanel,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        addSpace(root, 30)
+
+        root.addView(
+            makeText("СОСТОЯНИЕ МОДЕЛИ", 14f, muted, true)
+        )
+
+        addSpace(root, 10)
+
+        modelStatus = makeText(
+            if (modelDownloader.isModelDownloaded()) {
+                "Файл модели найден. Проверка при запуске."
+            } else {
+                "Модель ещё не загружена"
+            },
+            14f,
+            silver
+        )
+
+        root.addView(modelStatus!!)
+
+        addSpace(root, 18)
+
+        modelProgress = ProgressBar(
+            this,
+            null,
+            android.R.attr.progressBarStyleHorizontal
+        ).apply {
+            max = 100
+            progress = 0
+            progressTintList =
+                android.content.res.ColorStateList.valueOf(red)
+            progressBackgroundTintList =
+                android.content.res.ColorStateList.valueOf(panel)
+        }
+
+        root.addView(
+            modelProgress,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(12)
+            )
+        )
+
+        addSpace(root, 10)
+
+        modelSize = makeText(
+            "0 МБ / 0 МБ",
+            12f,
+            muted
+        )
+
+        root.addView(modelSize!!)
+
+        addSpace(root, 25)
+
+        modelActionButton = makeButton("СКАЧАТЬ МОДЕЛЬ") {
+            if (isDownloading) {
+                cancelModelDownload()
+            } else {
+                startModelDownload()
+            }
+        }
+
+        root.addView(modelActionButton!!)
+
+        addSpace(root, 16)
+
+        root.addView(
+            makeText(
+                "После загрузки файл будет сохранён во внутренней памяти приложения.",
+                12f,
+                muted
+            )
+        )
+
+        addSpace(root, 25)
+
+        root.addView(makeButton("НАЗАД") {
+            showHome()
+        })
+
+        setContentView(scroll)
+    }
+
+    // ЗАПУСК ЗАГРУЗКИ
+
+    private fun startModelDownload() {
+
+        if (isDownloading) return
+
+        isDownloading = true
+
+        modelActionButton?.text = "ОТМЕНИТЬ ЗАГРУЗКУ"
+        modelStatus?.text = "Подключение к серверу..."
+
+        modelDownloader.start(
+            object : AliceModelDownloader.Listener {
+
+                override fun onProgress(
+                    downloaded: Long,
+                    total: Long,
+                    percent: Int
+                ) {
+                    if (!isModelScreenOpen) return
+
+                    modelProgress?.progress = percent
+
+                    modelStatus?.text =
+                        "Загрузка модели: $percent%"
+
+                    modelSize?.text =
+                        "${formatBytes(downloaded)} / ${formatBytes(total)}"
+                }
+
+                override fun onComplete(file: File) {
+
+                    isDownloading = false
+
+                    modelProgress?.progress = 100
+
+                    modelStatus?.text =
+                        "Модель успешно загружена и проверена!"
+
+                    modelSize?.text =
+                        formatBytes(file.length())
+
+                    modelActionButton?.text = "МОДЕЛЬ ЗАГРУЖЕНА"
+
+                    showMessage(
+                        "Gemma 4 E2B успешно загружена!"
+                    )
+                }
+
+                override fun onError(message: String) {
+
+                    isDownloading = false
+
+                    modelStatus?.text =
+                        "Ошибка загрузки: $message"
+
+                    modelActionButton?.text =
+                        "ПОВТОРИТЬ ЗАГРУЗКУ"
+
+                    showMessage(message)
+                }
+
+                override fun onCancelled() {
+
+                    isDownloading = false
+
+                    modelStatus?.text =
+                        "Загрузка отменена. Можно продолжить позже."
+
+                    modelActionButton?.text =
+                        "ПРОДОЛЖИТЬ ЗАГРУЗКУ"
+                }
+            }
+        )
+    }
+
+    // ОТМЕНА ЗАГРУЗКИ
+
+    private fun cancelModelDownload() {
+
+        if (!isDownloading) return
+
+        modelStatus?.text = "Отмена загрузки..."
+
+        modelDownloader.cancel()
+    }
+
+    // ФОРМАТИРОВАНИЕ РАЗМЕРА
+
+    private fun formatBytes(bytes: Long): String {
+
+        val mb = bytes / (1024.0 * 1024.0)
+
+        return if (mb >= 1024) {
+            String.format(
+                java.util.Locale.US,
+                "%.2f ГБ",
+                mb / 1024.0
+            )
+        } else {
+            String.format(
+                java.util.Locale.US,
+                "%.1f МБ",
+                mb
+            )
+        }
+    }
+
     // ЭКРАН ОБЩЕНИЯ
 
     private fun showChat() {
 
         isChatOpen = true
+        isModelScreenOpen = false
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(navy)
             setPadding(dp(16), dp(12), dp(16), dp(12))
         }
-
-        // УЧЁТ СИСТЕМНЫХ ПАНЕЛЕЙ И КЛАВИАТУРЫ
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
 
@@ -219,8 +520,6 @@ class MainActivity : Activity() {
                 insets
             }
         }
-
-        // ВЕРХНЯЯ ПАНЕЛЬ
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -276,8 +575,6 @@ class MainActivity : Activity() {
 
         addSpace(root, 12)
 
-        // ОБЛАСТЬ СООБЩЕНИЙ
-
         messagesScroll = ScrollView(this).apply {
             setBackgroundColor(navy)
             isVerticalScrollBarEnabled = false
@@ -307,8 +604,6 @@ class MainActivity : Activity() {
         )
 
         addSpace(root, 10)
-
-        // ПОЛЕ ВВОДА
 
         val composer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -382,8 +677,6 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             root.requestApplyInsets()
         }
-
-        // ПРИВЕТСТВИЕ И ИСТОРИЯ ПЕРЕПИСКИ
 
         if (chatHistory.isEmpty()) {
             chatHistory.add(
