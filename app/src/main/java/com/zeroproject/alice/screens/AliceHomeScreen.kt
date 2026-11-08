@@ -19,7 +19,8 @@ class AliceHomeScreen(
     private val onChatClick: () -> Unit,
     private val onVoiceClick: () -> Unit,
     private val onModelClick: () -> Unit,
-    private val onSettingsClick: () -> Unit
+    private val onSettingsClick: () -> Unit,
+    private val onEngineerClick: () -> Unit = {}
 ) {
 
     private val navy = Color.rgb(11, 20, 38)
@@ -108,6 +109,10 @@ class AliceHomeScreen(
         addSpace(root, 14)
 
         root.addView(makeButton("ГОЛОС", onVoiceClick))
+
+        addSpace(root, 14)
+
+        root.addView(makeButton("ИНЖЕНЕРНАЯ ЛАБОРАТОРИЯ", onEngineerClick))
 
         addSpace(root, 14)
 
