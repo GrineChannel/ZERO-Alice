@@ -13,7 +13,10 @@ class AliceChatManager(
 
     private val memoryCommands = AliceMemoryCommands(memory)
 
-    private val memoryManager = AliceMemoryManager(memory)
+    private val memoryManager = AliceMemoryManager(
+        memory,
+        engine
+    )
 
     @Volatile
     private var contextInjected = false
@@ -58,10 +61,9 @@ class AliceChatManager(
         return """
             ДОЛГОВРЕМЕННАЯ ПАМЯТЬ:
 
-            Ниже находятся сведения, которые были сохранены
-            автоматически или по просьбе пользователя.
+            Используй эти сведения, если они относятся
+            к текущему разговору.
 
-            Используй их, когда они относятся к разговору.
             Не выдумывай дополнительные факты.
             Если сведения противоречат друг другу,
             уточни информацию у пользователя.
@@ -83,7 +85,7 @@ class AliceChatManager(
             return
         }
 
-        // Обработка команд управления памятью.
+        // Сначала проверяем команды управления памятью.
 
         val commandResponse = memoryCommands.handle(text)
 
@@ -96,18 +98,12 @@ class AliceChatManager(
             return
         }
 
-        // Автоматическое сохранение полезной информации.
-
-        try {
-            memoryManager.analyzeAndSave(text)
-        } catch (_: Throwable) {
-            // Ошибка памяти не должна мешать общению.
-        }
-
         if (!engine.isReady()) {
             onError("Локальный ИИ ещё не загружен")
             return
         }
+
+        // Формируем контекст для основной беседы.
 
         val previousContext =
             if (contextInjected) "" else buildPreviousContext()
@@ -140,6 +136,21 @@ class AliceChatManager(
                 memory.saveMessage("assistant", response)
 
                 contextInjected = true
+
+                // После ответа отправляем обе стороны
+                // диалога на отдельный анализ памяти.
+
+                val dialogue = """
+                    Пользователь:
+                    $text
+
+                    Элис:
+                    $response
+                """.trimIndent()
+
+                memoryManager.analyzeDialogue(
+                    dialogue = dialogue
+                )
 
                 onResponse(response)
             },
