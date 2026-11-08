@@ -2,8 +2,13 @@
 package com.zeroproject.alice.engineer.minecraft
 
 import android.content.Context
+
 import com.zeroproject.alice.AliceLocalEngine
 import com.zeroproject.alice.engineer.AliceEngineerCore
+import com.zeroproject.alice.engineer.AliceEngineerPlanner
+import com.zeroproject.alice.engineer.AliceEngineerCodeGenerator
+import com.zeroproject.alice.engineer.AliceEngineerFileWriter
+import com.zeroproject.alice.engineer.EngineerPlan
 import com.zeroproject.alice.engineer.EngineerTask
 import com.zeroproject.alice.engineer.EngineerTaskStatus
 
@@ -307,7 +312,9 @@ class AliceMinecraftEngineer(context: Context) {
 
                 failTask(
                     taskId,
-                    details.ifBlank { "Тестирование не пройдено" },
+                    details.ifBlank {
+                        "Тестирование не пройдено"
+                    },
                     onError
                 )
                 return
