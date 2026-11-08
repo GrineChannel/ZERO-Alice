@@ -28,7 +28,10 @@ class AliceMinecraftTestLab(
         AliceMinecraftValidator(),
 
     private val builder: AliceMinecraftAddonBuilder =
-        AliceMinecraftAddonBuilder(validator)
+        AliceMinecraftAddonBuilder(validator),
+
+    private val archiveVerifier: AliceMinecraftArchiveVerifier =
+        AliceMinecraftArchiveVerifier()
 ) {
 
     fun runTests(
@@ -39,55 +42,40 @@ class AliceMinecraftTestLab(
         val steps = mutableListOf<MinecraftTestStep>()
         var addonFile: File? = null
 
-        // 1. Проверка существования проекта
-
         if (!project.directory.exists() ||
             !project.directory.isDirectory
         ) {
-
             steps.add(
                 MinecraftTestStep(
-                    name = "Структура проекта",
-                    status = MinecraftTestStatus.FAILED,
-                    details = "Папка проекта не найдена"
+                    "Структура проекта",
+                    MinecraftTestStatus.FAILED,
+                    "Папка проекта не найдена"
                 )
             )
 
-            return createReport(
-                project,
-                steps,
-                null
-            )
+            return createReport(project, steps, null)
         }
 
         steps.add(
             MinecraftTestStep(
-                name = "Структура проекта",
-                status = MinecraftTestStatus.PASSED,
-                details = "Папка проекта доступна"
+                "Структура проекта",
+                MinecraftTestStatus.PASSED,
+                "Папка проекта доступна"
             )
         )
-
-        // 2. Проверка Minecraft Add-on
 
         val validation = try {
             validator.validateProject(project)
         } catch (error: Exception) {
-
             steps.add(
                 MinecraftTestStep(
-                    name = "Проверка Add-on",
-                    status = MinecraftTestStatus.FAILED,
-                    details = error.message
-                        ?: "Неизвестная ошибка проверки"
+                    "Проверка Add-on",
+                    MinecraftTestStatus.FAILED,
+                    error.message ?: "Ошибка проверки проекта"
                 )
             )
 
-            return createReport(
-                project,
-                steps,
-                null
-            )
+            return createReport(project, steps, null)
         }
 
         val errors = validation.issues.filter {
@@ -99,35 +87,28 @@ class AliceMinecraftTestLab(
         }
 
         if (errors.isNotEmpty()) {
-
-            val details = errors.joinToString("\n") {
-                "${it.file}: ${it.message}"
-            }
-
             steps.add(
                 MinecraftTestStep(
-                    name = "Проверка Add-on",
-                    status = MinecraftTestStatus.FAILED,
-                    details = details
+                    "Проверка Add-on",
+                    MinecraftTestStatus.FAILED,
+                    errors.joinToString("\n") {
+                        "${it.file}: ${it.message}"
+                    }
                 )
             )
 
-            return createReport(
-                project,
-                steps,
-                null
-            )
+            return createReport(project, steps, null)
         }
 
         steps.add(
             MinecraftTestStep(
-                name = "Проверка Add-on",
-                status = if (warnings.isEmpty()) {
+                "Проверка Add-on",
+                if (warnings.isEmpty()) {
                     MinecraftTestStatus.PASSED
                 } else {
                     MinecraftTestStatus.WARNING
                 },
-                details = if (warnings.isEmpty()) {
+                if (warnings.isEmpty()) {
                     "Ошибок и предупреждений не обнаружено"
                 } else {
                     warnings.joinToString("\n") {
@@ -137,68 +118,70 @@ class AliceMinecraftTestLab(
             )
         )
 
-        // 3. Сборка Add-on
-
-        if (buildAddon) {
-
-            try {
-
-                val result = builder.build(project)
-
-                addonFile = result.addonFile
-
-                steps.add(
-                    MinecraftTestStep(
-                        name = "Сборка Add-on",
-                        status = MinecraftTestStatus.PASSED,
-                        details = "Архив создан: ${result.addonFile.name}"
-                    )
-                )
-
-                // 4. Проверка результата сборки
-
-                val fileExists = result.addonFile.isFile
-                val fileNotEmpty = result.addonFile.length() > 0L
-
-                if (fileExists && fileNotEmpty) {
-
-                    steps.add(
-                        MinecraftTestStep(
-                            name = "Проверка архива",
-                            status = MinecraftTestStatus.PASSED,
-                            details = "Файл существует и не пуст"
-                        )
-                    )
-
-                } else {
-
-                    steps.add(
-                        MinecraftTestStep(
-                            name = "Проверка архива",
-                            status = MinecraftTestStatus.FAILED,
-                            details = "Созданный архив отсутствует или пуст"
-                        )
-                    )
-                }
-
-            } catch (error: Exception) {
-
-                steps.add(
-                    MinecraftTestStep(
-                        name = "Сборка Add-on",
-                        status = MinecraftTestStatus.FAILED,
-                        details = error.message
-                            ?: "Ошибка сборки"
-                    )
-                )
-            }
+        if (!buildAddon) {
+            return createReport(project, steps, null)
         }
 
-        return createReport(
-            project,
-            steps,
-            addonFile
-        )
+        try {
+            val result = builder.build(project)
+            addonFile = result.addonFile
+
+            steps.add(
+                MinecraftTestStep(
+                    "Сборка Add-on",
+                    MinecraftTestStatus.PASSED,
+                    "Создан архив: ${result.addonFile.name}"
+                )
+            )
+
+        } catch (error: Exception) {
+            steps.add(
+                MinecraftTestStep(
+                    "Сборка Add-on",
+                    MinecraftTestStatus.FAILED,
+                    error.message ?: "Ошибка сборки"
+                )
+            )
+
+            return createReport(project, steps, null)
+        }
+
+        // Проверка итогового архива
+
+        val verification = try {
+            archiveVerifier.verifyAddon(addonFile!!)
+        } catch (error: Exception) {
+            steps.add(
+                MinecraftTestStep(
+                    "Проверка архива",
+                    MinecraftTestStatus.FAILED,
+                    error.message ?: "Ошибка проверки архива"
+                )
+            )
+
+            return createReport(project, steps, addonFile)
+        }
+
+        if (verification.valid) {
+            steps.add(
+                MinecraftTestStep(
+                    "Проверка архива",
+                    MinecraftTestStatus.PASSED,
+                    "Проверено пакетов: ${verification.checkedPacks}. " +
+                        "Файлов во внешнем архиве: ${verification.checkedFiles}."
+                )
+            )
+        } else {
+            steps.add(
+                MinecraftTestStep(
+                    "Проверка архива",
+                    MinecraftTestStatus.FAILED,
+                    verification.errors.joinToString("\n")
+                )
+            )
+        }
+
+        return createReport(project, steps, addonFile)
     }
 
     private fun createReport(
