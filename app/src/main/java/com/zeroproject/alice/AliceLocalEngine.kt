@@ -19,18 +19,13 @@ class AliceLocalEngine(context: Context) {
 
     private val appContext = context.applicationContext
 
-    // Все запросы к Gemma выполняются последовательно.
     private val executor = Executors.newSingleThreadExecutor()
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var engine: Engine? = null
 
-    // Основная беседа с пользователем.
     private var conversation: Conversation? = null
-
-    // Изолированная беседа для анализа памяти.
-    private var memoryConversation: Conversation? = null
 
     @Volatile
     private var initialized = false
@@ -40,17 +35,17 @@ class AliceLocalEngine(context: Context) {
         "gemma-4-E2B-it.litertlm"
     )
 
-    // ИНИЦИАЛИЗАЦИЯ МОДЕЛИ
+    // ИНИЦИАЛИЗАЦИЯ
 
     fun initialize(
         onReady: () -> Unit,
         onError: (String) -> Unit
     ) {
+
         executor.execute {
 
             var newEngine: Engine? = null
             var newConversation: Conversation? = null
-            var newMemoryConversation: Conversation? = null
 
             try {
 
@@ -69,8 +64,6 @@ class AliceLocalEngine(context: Context) {
                 newEngine = Engine(config)
 
                 newEngine.initialize()
-
-                // Основная беседа.
 
                 newConversation =
                     newEngine.createConversation(
@@ -110,31 +103,8 @@ class AliceLocalEngine(context: Context) {
                         )
                     )
 
-                // Отдельная беседа для анализа памяти.
-
-                newMemoryConversation =
-                    newEngine.createConversation(
-                        ConversationConfig(
-                            systemInstruction = Contents.of(
-                                """
-                                Ты — внутренний модуль анализа
-                                долговременной памяти Элис.
-
-                                Твоя задача — анализировать переданный
-                                диалог и извлекать полезные воспоминания.
-
-                                Не веди обычный разговор.
-                                Не обращайся к пользователю.
-                                Выполняй только инструкции
-                                полученного задания.
-                                """.trimIndent()
-                            )
-                        )
-                    )
-
                 engine = newEngine
                 conversation = newConversation
-                memoryConversation = newMemoryConversation
 
                 initialized = true
 
@@ -145,10 +115,6 @@ class AliceLocalEngine(context: Context) {
             } catch (error: Throwable) {
 
                 try {
-                    newMemoryConversation?.close()
-                } catch (_: Throwable) {}
-
-                try {
                     newConversation?.close()
                 } catch (_: Throwable) {}
 
@@ -156,11 +122,9 @@ class AliceLocalEngine(context: Context) {
                     newEngine?.close()
                 } catch (_: Throwable) {}
 
-                initialized = false
-
                 engine = null
                 conversation = null
-                memoryConversation = null
+                initialized = false
 
                 mainHandler.post {
                     onError(
@@ -171,7 +135,7 @@ class AliceLocalEngine(context: Context) {
         }
     }
 
-    // ОТПРАВКА СООБЩЕНИЯ ПОЛЬЗОВАТЕЛЯ
+    // ОСНОВНОЙ ДИАЛОГ
 
     fun sendMessage(
         text: String,
@@ -212,7 +176,7 @@ class AliceLocalEngine(context: Context) {
         }
     }
 
-    // АНАЛИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ
+    // ИЗОЛИРОВАННЫЙ АНАЛИЗ ПАМЯТИ
 
     fun analyzeMemory(
         prompt: String,
@@ -222,11 +186,15 @@ class AliceLocalEngine(context: Context) {
 
         executor.execute {
 
+            var analysisConversation: Conversation? = null
+
             try {
 
-                if (!initialized || memoryConversation == null) {
+                val activeEngine = engine
+
+                if (!initialized || activeEngine == null) {
                     throw IllegalStateException(
-                        "Модуль анализа памяти ещё не загружен"
+                        "Локальный ИИ ещё не загружен"
                     )
                 }
 
@@ -236,15 +204,46 @@ class AliceLocalEngine(context: Context) {
                     )
                 }
 
-                // Запрос отправляется только в отдельную беседу.
+                // Создаём новую временную беседу
+                // для каждого отдельного анализа.
+
+                analysisConversation =
+                    activeEngine.createConversation(
+                        ConversationConfig(
+                            systemInstruction = Contents.of(
+                                """
+                                Ты — внутренний модуль анализа
+                                долговременной памяти Элис.
+
+                                Не веди обычный разговор.
+                                Не обращайся к пользователю.
+                                Выполняй только переданное задание.
+                                Возвращай результат строго
+                                в указанном формате.
+                                """.trimIndent()
+                            )
+                        )
+                    )
+
                 val response =
-                    memoryConversation!!.sendMessage(prompt)
+                    analysisConversation.sendMessage(prompt)
+
+                val result = response.toString()
+
+                // Закрываем временную беседу.
+
+                analysisConversation.close()
+                analysisConversation = null
 
                 mainHandler.post {
-                    onResult(response.toString())
+                    onResult(result)
                 }
 
             } catch (error: Throwable) {
+
+                try {
+                    analysisConversation?.close()
+                } catch (_: Throwable) {}
 
                 mainHandler.post {
                     onError(
@@ -261,15 +260,11 @@ class AliceLocalEngine(context: Context) {
         return initialized
     }
 
-    // ОСВОБОЖДЕНИЕ РЕСУРСОВ
+    // ЗАКРЫТИЕ
 
     fun close() {
 
         executor.execute {
-
-            try {
-                memoryConversation?.close()
-            } catch (_: Throwable) {}
 
             try {
                 conversation?.close()
@@ -279,10 +274,8 @@ class AliceLocalEngine(context: Context) {
                 engine?.close()
             } catch (_: Throwable) {}
 
-            memoryConversation = null
             conversation = null
             engine = null
-
             initialized = false
         }
 
