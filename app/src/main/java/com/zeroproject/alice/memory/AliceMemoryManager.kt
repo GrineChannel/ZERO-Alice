@@ -1,15 +1,145 @@
 
 package com.zeroproject.alice.memory
 
+import com.zeroproject.alice.AliceLocalEngine
+
 class AliceMemoryManager(
-    private val memory: AliceMemory
+    private val memory: AliceMemory,
+    private val engine: AliceLocalEngine
 ) {
 
-    companion object {
-        private const val MAX_FACT_LENGTH = 500
-        private const val MAX_FACTS = 500
+    private val extractor = AliceMemoryExtractor()
 
-        private val sensitivePatterns = listOf(
+    @Volatile
+    private var analysisRunning = false
+
+    /**
+     * Передаёт диалог локальной Gemma
+     * для извлечения важных воспоминаний.
+     */
+    fun analyzeDialogue(
+        dialogue: String,
+        onComplete: (Int) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+
+        if (dialogue.isBlank()) {
+            onComplete(0)
+            return
+        }
+
+        synchronized(this) {
+            if (analysisRunning) {
+                onComplete(0)
+                return
+            }
+
+            analysisRunning = true
+        }
+
+        val prompt = extractor.buildPrompt(dialogue)
+
+        engine.analyzeMemory(
+            prompt = prompt,
+
+            onResult = { response ->
+
+                try {
+                    val extracted = extractor.parseResponse(response)
+
+                    var savedCount = 0
+
+                    for (fact in extracted) {
+
+                        if (containsSensitiveInformation(
+                                fact.key + " " + fact.value
+                            )
+                        ) {
+                            continue
+                        }
+
+                        if (saveOrUpdateFact(fact)) {
+                            savedCount++
+                        }
+                    }
+
+                    onComplete(savedCount)
+
+                } catch (error: Throwable) {
+
+                    onError(
+                        error.message ?: "Ошибка сохранения памяти"
+                    )
+
+                } finally {
+
+                    synchronized(this) {
+                        analysisRunning = false
+                    }
+                }
+            },
+
+            onError = { error ->
+
+                synchronized(this) {
+                    analysisRunning = false
+                }
+
+                onError(error)
+            }
+        )
+    }
+
+    /**
+     * Сохраняет новый факт или обновляет существующий.
+     */
+    private fun saveOrUpdateFact(
+        fact: ExtractedMemory
+    ): Boolean {
+
+        val key = fact.key.trim()
+        val value = fact.value.trim()
+
+        if (key.isBlank() || value.isBlank()) {
+            return false
+        }
+
+        if (key.length > 100 || value.length > 500) {
+            return false
+        }
+
+        val existingFacts = memory.getFacts()
+
+        val existing = existingFacts.firstOrNull {
+            it.key.equals(key, ignoreCase = true)
+        }
+
+        if (existing != null) {
+
+            if (existing.value.equals(value, ignoreCase = true)) {
+                return false
+            }
+
+            memory.saveFact(key, value)
+            return true
+        }
+
+        if (existingFacts.size >= 500) {
+            return false
+        }
+
+        memory.saveFact(key, value)
+        return true
+    }
+
+    /**
+     * Фильтрация чувствительной информации.
+     */
+    private fun containsSensitiveInformation(
+        text: String
+    ): Boolean {
+
+        val patterns = listOf(
             Regex("""(?i)\bpassword\b"""),
             Regex("""(?i)\bпароль\b"""),
             Regex("""(?i)\btoken\b"""),
@@ -20,137 +150,14 @@ class AliceMemoryManager(
             Regex("""(?i)\bномер карты\b"""),
             Regex("""(?i)\bcvv\b""")
         )
-    }
 
-    /**
-     * Анализирует сообщение и сохраняет
-     * полезную информацию без подтверждения.
-     */
-    fun analyzeAndSave(text: String): Int {
-
-        if (text.isBlank()) return 0
-
-        val normalized = text.trim()
-
-        if (normalized.length > MAX_FACT_LENGTH) {
-            return 0
-        }
-
-        if (containsSensitiveInformation(normalized)) {
-            return 0
-        }
-
-        val fact = extractFact(normalized)
-            ?: return 0
-
-        val existingFacts = memory.getFacts()
-
-        if (
-            existingFacts.none {
-                it.key == fact.first &&
-                it.value.equals(fact.second, ignoreCase = true)
-            }
-        ) {
-            if (existingFacts.size >= MAX_FACTS) {
-                return 0
-            }
-
-            memory.saveFact(
-                fact.first,
-                fact.second
-            )
-
-            return 1
-        }
-
-        return 0
-    }
-
-    /**
-     * Определяет простые факты
-     * по формулировкам пользователя.
-     */
-    private fun extractFact(text: String): Pair<String, String>? {
-
-        val patterns = listOf(
-            Triple(
-                Regex("""(?i)^меня зовут\s+(.+)$"""),
-                "имя пользователя",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^моё имя\s+(.+)$"""),
-                "имя пользователя",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^мне нравится\s+(.+)$"""),
-                "предпочтения пользователя",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^я люблю\s+(.+)$"""),
-                "интересы пользователя",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^мой проект называется\s+(.+)$"""),
-                "название проекта",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^я работаю над проектом\s+(.+)$"""),
-                "текущий проект",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^я живу в\s+(.+)$"""),
-                "место проживания",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^моя цель\s*[:—-]?\s*(.+)$"""),
-                "цель пользователя",
-                1
-            ),
-            Triple(
-                Regex("""(?i)^я планирую\s+(.+)$"""),
-                "планы пользователя",
-                1
-            )
-        )
-
-        for ((regex, key, group) in patterns) {
-
-            val match = regex.find(text)
-                ?: continue
-
-            val value = match.groupValues[group]
-                .trim()
-                .trimEnd('.', '!', '?')
-
-            if (value.isBlank()) return null
-
-            return key to value
-        }
-
-        return null
-    }
-
-    /**
-     * Защита от сохранения секретов.
-     */
-    private fun containsSensitiveInformation(
-        text: String
-    ): Boolean {
-
-        return sensitivePatterns.any {
+        return patterns.any {
             it.containsMatchIn(text)
         }
     }
 
     /**
-     * Получение текущей долговременной памяти.
+     * Получение воспоминаний.
      */
     fun getMemories(): List<AliceFact> {
         return memory.getFacts()
@@ -161,5 +168,16 @@ class AliceMemoryManager(
      */
     fun forget(id: Long) {
         memory.deleteFact(id)
+    }
+
+    /**
+     * Полная очистка долговременной памяти.
+     */
+    fun clear() {
+        memory.clearFacts()
+    }
+
+    fun isAnalyzing(): Boolean {
+        return analysisRunning
     }
 }
