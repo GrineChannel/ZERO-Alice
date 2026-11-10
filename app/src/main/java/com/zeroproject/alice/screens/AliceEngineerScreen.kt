@@ -43,7 +43,7 @@ class AliceEngineerScreen(
         setHintTextColor(mutedColor)
         setTextColor(textColor)
         textSize = 15f
-        singleLine = true
+        setSingleLine(true)
         setPadding(dp(12), dp(10), dp(12), dp(10))
         background = roundedBackground(panelColor, 10)
     }
@@ -100,10 +100,12 @@ class AliceEngineerScreen(
 
         val backButton = createButton("←")
         backButton.textSize = 20f
+
         header.addView(
             backButton,
             LinearLayout.LayoutParams(dp(52), dp(48))
         )
+
         backButton.setOnClickListener {
             onBackClick()
         }
@@ -129,6 +131,7 @@ class AliceEngineerScreen(
         root.addView(header)
 
         addSectionTitle("MINECRAFT BEDROCK")
+
         addDescription(
             "Создание, программирование и проверка игровых дополнений."
         )
@@ -150,6 +153,7 @@ class AliceEngineerScreen(
         )
 
         addSectionTitle("НОВЫЙ ПРОЕКТ")
+
         root.addView(
             projectNameInput,
             marginParams(bottom = 8)
@@ -161,6 +165,7 @@ class AliceEngineerScreen(
         )
 
         val createButton = createButton("СОЗДАТЬ ПРОЕКТ")
+
         root.addView(
             createButton,
             marginParams(bottom = 8)
@@ -168,6 +173,7 @@ class AliceEngineerScreen(
 
         createButton.setOnClickListener {
             val name = projectNameInput.text.toString().trim()
+
             val description =
                 projectDescriptionInput.text.toString().trim()
 
@@ -183,9 +189,7 @@ class AliceEngineerScreen(
 
         addSectionTitle("ЗАДАНИЕ ДЛЯ ЭЛИС")
 
-        root.addView(
-            selectedProjectText
-        )
+        root.addView(selectedProjectText)
 
         root.addView(
             goalInput,
@@ -217,6 +221,7 @@ class AliceEngineerScreen(
         }
 
         addSectionTitle("СОСТОЯНИЕ")
+
         root.addView(statusText)
 
         return root
@@ -251,6 +256,7 @@ class AliceEngineerScreen(
                 }
 
                 textSize = 15f
+
                 setTextColor(
                     if (project.id == selectedProjectId) {
                         accentColor
@@ -260,13 +266,16 @@ class AliceEngineerScreen(
                 )
 
                 setPadding(dp(12), dp(14), dp(12), dp(14))
+
                 background = roundedBackground(panelColor, 10)
+
                 isClickable = true
                 isFocusable = true
             }
 
             item.setOnClickListener {
                 selectedProjectId = project.id
+
                 selectedProjectText.text =
                     "Выбран проект: ${project.name}"
 
@@ -336,6 +345,7 @@ class AliceEngineerScreen(
             textSize = 12f
             setTextColor(Color.WHITE)
             isAllCaps = false
+
             background = roundedBackground(
                 Color.rgb(37, 91, 155),
                 10
