@@ -195,6 +195,10 @@ class AliceEngineerCore(
         current: EngineerTaskStatus,
         next: EngineerTaskStatus
     ): Boolean {
+        // Несколько последовательных шагов генерации используют один статус.
+        // Повторная установка активного статуса обновляет сообщение этапа.
+        if (current == next) return true
+
         if (next == EngineerTaskStatus.FAILED ||
             next == EngineerTaskStatus.CANCELLED
         ) {
