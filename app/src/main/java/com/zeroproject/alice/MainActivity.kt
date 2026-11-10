@@ -28,7 +28,6 @@ class MainActivity : Activity() {
     private lateinit var chatManager: AliceChatManager
     private lateinit var minecraftEngineer: AliceMinecraftEngineer
     private var engineerScreen: AliceEngineerScreen? = null
-    private var isEngineerOpen = false
     private var engineerBusy = false
 
     private var modelScreen: AliceModelScreen? = null
@@ -36,8 +35,12 @@ class MainActivity : Activity() {
 
     private val chatHistory = mutableListOf<Pair<String, Boolean>>()
 
-    private var isChatOpen = false
-    private var isModelScreenOpen = false
+    private enum class Screen { HOME, CHAT, MODEL, ENGINEER }
+
+    private var currentScreen = Screen.HOME
+    private val isChatOpen get() = currentScreen == Screen.CHAT
+    private val isModelScreenOpen get() = currentScreen == Screen.MODEL
+    private val isEngineerOpen get() = currentScreen == Screen.ENGINEER
     private var isDownloading = false
 
     private var isInitializingAI = false
@@ -89,7 +92,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android API")
     override fun onBackPressed() {
 
-        if (isChatOpen || isModelScreenOpen || isEngineerOpen) {
+        if (currentScreen != Screen.HOME) {
             showHome()
             return
         }
@@ -113,9 +116,7 @@ class MainActivity : Activity() {
 
     private fun showHome() {
 
-        isChatOpen = false
-        isModelScreenOpen = false
-        isEngineerOpen = false
+        currentScreen = Screen.HOME
 
         chatScreen = null
         engineerScreen = null
@@ -157,9 +158,7 @@ class MainActivity : Activity() {
 
     private fun showModelScreen() {
 
-        isChatOpen = false
-        isModelScreenOpen = true
-        isEngineerOpen = false
+        currentScreen = Screen.MODEL
         engineerScreen = null
         chatScreen = null
 
@@ -338,9 +337,7 @@ class MainActivity : Activity() {
 
     private fun showChat() {
 
-        isChatOpen = true
-        isModelScreenOpen = false
-        isEngineerOpen = false
+        currentScreen = Screen.CHAT
         engineerScreen = null
         modelScreen = null
 
@@ -404,9 +401,7 @@ class MainActivity : Activity() {
     }
 
     private fun showEngineer() {
-        isChatOpen = false
-        isModelScreenOpen = false
-        isEngineerOpen = true
+        currentScreen = Screen.ENGINEER
         chatScreen = null
         modelScreen = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
