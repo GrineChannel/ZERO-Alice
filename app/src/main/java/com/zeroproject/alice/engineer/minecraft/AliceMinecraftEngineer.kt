@@ -19,7 +19,10 @@ data class MinecraftEngineerResult(
     val testReport: MinecraftTestReport
 )
 
-class AliceMinecraftEngineer(context: Context) {
+class AliceMinecraftEngineer(
+    context: Context,
+    sharedEngine: AliceLocalEngine
+) {
 
     private val appContext = context.applicationContext
 
@@ -30,7 +33,9 @@ class AliceMinecraftEngineer(context: Context) {
         projectManager
     )
 
-    val localEngine = AliceLocalEngine(appContext)
+    // Используем общий движок из MainActivity.
+    // Вторую копию Gemma не создаём.
+    val localEngine = sharedEngine
 
     private val planner = AliceEngineerPlanner(localEngine)
 
@@ -46,10 +51,13 @@ class AliceMinecraftEngineer(context: Context) {
         onReady: () -> Unit,
         onError: (String) -> Unit
     ) {
-        localEngine.initialize(
-            onReady = onReady,
-            onError = onError
-        )
+        if (localEngine.isReady()) {
+            onReady()
+        } else {
+            onError(
+                "Общий движок Элис ещё не инициализирован"
+            )
+        }
     }
 
     fun createProject(
@@ -364,13 +372,14 @@ class AliceMinecraftEngineer(context: Context) {
                 message
             )
         } catch (_: Exception) {
-            // Сохраняем исходную ошибку
+            // Сохраняем исходную ошибку.
         }
 
         onError(message)
     }
 
     fun close() {
-        localEngine.close()
+        // Общий движок принадлежит MainActivity.
+        // Здесь закрывать его нельзя.
     }
 }
