@@ -130,6 +130,9 @@ class AliceEngineerScreen(
 
         root.addView(header)
 
+        addSectionTitle("СОСТОЯНИЕ РАЗРАБОТКИ")
+        root.addView(statusText)
+
         addSectionTitle("MINECRAFT BEDROCK")
 
         addDescription(
@@ -220,11 +223,14 @@ class AliceEngineerScreen(
             onDevelop(projectId, goal)
         }
 
-        addSectionTitle("СОСТОЯНИЕ")
-
-        root.addView(statusText)
-
-        return root
+        val scroll = ScrollView(context).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = true
+            setBackgroundColor(backgroundColor)
+        }
+        (root.parent as? android.view.ViewGroup)?.removeView(root)
+        scroll.addView(root)
+        return scroll
     }
 
     fun updateProjects(newProjects: List<MinecraftProject>) {
