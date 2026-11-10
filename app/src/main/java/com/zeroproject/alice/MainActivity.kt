@@ -11,6 +11,8 @@ import android.widget.Toast
 import com.zeroproject.alice.screens.AliceHomeScreen
 import com.zeroproject.alice.screens.AliceModelScreen
 import com.zeroproject.alice.screens.AliceChatScreen
+import com.zeroproject.alice.screens.AliceEngineerScreen
+import com.zeroproject.alice.engineer.minecraft.AliceMinecraftEngineer
 
 import com.zeroproject.alice.memory.AliceMemory
 import com.zeroproject.alice.chat.AliceChatManager
@@ -24,6 +26,10 @@ class MainActivity : Activity() {
 
     private lateinit var aliceMemory: AliceMemory
     private lateinit var chatManager: AliceChatManager
+    private lateinit var minecraftEngineer: AliceMinecraftEngineer
+    private var engineerScreen: AliceEngineerScreen? = null
+    private var isEngineerOpen = false
+    private var engineerBusy = false
 
     private var modelScreen: AliceModelScreen? = null
     private var chatScreen: AliceChatScreen? = null
@@ -51,6 +57,7 @@ class MainActivity : Activity() {
             localEngine,
             aliceMemory
         )
+        minecraftEngineer = AliceMinecraftEngineer(this, localEngine)
 
         window.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
@@ -82,7 +89,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android API")
     override fun onBackPressed() {
 
-        if (isChatOpen || isModelScreenOpen) {
+        if (isChatOpen || isModelScreenOpen || isEngineerOpen) {
             showHome()
             return
         }
@@ -108,8 +115,10 @@ class MainActivity : Activity() {
 
         isChatOpen = false
         isModelScreenOpen = false
+        isEngineerOpen = false
 
         chatScreen = null
+        engineerScreen = null
         modelScreen = null
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -137,7 +146,8 @@ class MainActivity : Activity() {
                 showMessage(
                     "Настройки будут добавлены следующим этапом"
                 )
-            }
+            },
+            onEngineerClick = { showEngineer() }
         )
 
         setContentView(homeScreen.create())
@@ -149,6 +159,8 @@ class MainActivity : Activity() {
 
         isChatOpen = false
         isModelScreenOpen = true
+        isEngineerOpen = false
+        engineerScreen = null
         chatScreen = null
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -328,6 +340,8 @@ class MainActivity : Activity() {
 
         isChatOpen = true
         isModelScreenOpen = false
+        isEngineerOpen = false
+        engineerScreen = null
         modelScreen = null
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -389,6 +403,68 @@ class MainActivity : Activity() {
         initializeAI()
     }
 
+    private fun showEngineer() {
+        isChatOpen = false
+        isModelScreenOpen = false
+        isEngineerOpen = true
+        chatScreen = null
+        modelScreen = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(true)
+        }
+        val screen = AliceEngineerScreen(
+            context = this,
+            onBackClick = { showHome() },
+            onCreateProject = { name, description ->
+                try {
+                    val project = minecraftEngineer.createProject(name, description)
+                    engineerScreen?.updateProjects(minecraftEngineer.projectManager.listProjects())
+                    engineerScreen?.setStatus("Проект создан: ${project.name}. Выбери его в списке.")
+                } catch (error: Exception) {
+                    engineerScreen?.setStatus("Ошибка создания: ${error.message}")
+                }
+            },
+            onDevelop = { projectId, goal ->
+                if (engineerBusy) {
+                    engineerScreen?.setStatus("Разработка уже выполняется")
+                } else if (!localEngine.isReady()) {
+                    engineerScreen?.setStatus("ИИ ещё не готов. Дождись загрузки модели.")
+                    initializeAI()
+                } else {
+                    engineerBusy = true
+                    engineerScreen?.setBusy(true)
+                    minecraftEngineer.develop(
+                        projectId = projectId,
+                        goal = goal,
+                        onProgress = { message ->
+                            runOnUiThread { if (isEngineerOpen) engineerScreen?.setStatus(message) }
+                        },
+                        onResult = { result ->
+                            runOnUiThread {
+                                engineerBusy = false
+                                if (isEngineerOpen) engineerScreen?.showResult("Готово: ${result.project.name}. Проверка: ${result.testReport.status}")
+                            }
+                        },
+                        onError = { error ->
+                            runOnUiThread {
+                                engineerBusy = false
+                                if (isEngineerOpen) engineerScreen?.showResult("Ошибка разработки: $error")
+                            }
+                        }
+                    )
+                }
+            }
+        )
+        engineerScreen = screen
+        setContentView(screen.createView())
+        screen.updateProjects(minecraftEngineer.projectManager.listProjects())
+        screen.setBusy(engineerBusy)
+        if (!localEngine.isReady()) {
+            screen.setStatus("Подготовка локального ИИ...")
+            initializeAI()
+        }
+    }
+
     // СОСТОЯНИЕ ИИ
 
     private fun getAIStatusText(): String {
@@ -420,6 +496,7 @@ class MainActivity : Activity() {
 
         if (localEngine.isReady()) {
             updateChatControls()
+            if (isEngineerOpen) engineerScreen?.setStatus("Локальный ИИ готов к разработке")
             return
         }
 
@@ -442,6 +519,7 @@ class MainActivity : Activity() {
             chatScreen?.addMessage(text, false)
 
             updateChatControls()
+            if (isEngineerOpen) engineerScreen?.setStatus(text)
             return
         }
 
@@ -455,6 +533,7 @@ class MainActivity : Activity() {
             onReady = {
 
                 isInitializingAI = false
+                if (isEngineerOpen) engineerScreen?.setStatus("Локальный ИИ готов к разработке")
 
                 val text =
                     "Я проснулась! ❤️ Теперь я могу отвечать с помощью локальной Gemma."
@@ -487,6 +566,7 @@ class MainActivity : Activity() {
                     updateChatControls()
                 }
 
+                if (isEngineerOpen) engineerScreen?.setStatus(text)
                 showMessage("Ошибка запуска Gemma: $error")
             }
         )
