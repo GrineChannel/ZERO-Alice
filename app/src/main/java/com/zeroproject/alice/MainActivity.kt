@@ -16,6 +16,7 @@ import com.zeroproject.alice.engineer.minecraft.AliceMinecraftEngineer
 
 import com.zeroproject.alice.memory.AliceMemory
 import com.zeroproject.alice.chat.AliceChatManager
+import com.zeroproject.alice.navigation.AliceNavigation
 
 import java.io.File
 
@@ -35,12 +36,10 @@ class MainActivity : Activity() {
 
     private val chatHistory = mutableListOf<Pair<String, Boolean>>()
 
-    private enum class Screen { HOME, CHAT, MODEL, ENGINEER }
-
-    private var currentScreen = Screen.HOME
-    private val isChatOpen get() = currentScreen == Screen.CHAT
-    private val isModelScreenOpen get() = currentScreen == Screen.MODEL
-    private val isEngineerOpen get() = currentScreen == Screen.ENGINEER
+    private val navigation = AliceNavigation()
+    private val isChatOpen get() = navigation.isChatOpen
+    private val isModelScreenOpen get() = navigation.isModelScreenOpen
+    private val isEngineerOpen get() = navigation.isEngineerOpen
     private var isDownloading = false
 
     private var isInitializingAI = false
@@ -92,7 +91,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android API")
     override fun onBackPressed() {
 
-        if (currentScreen != Screen.HOME) {
+        if (navigation.canNavigateBack) {
             showHome()
             return
         }
@@ -116,7 +115,7 @@ class MainActivity : Activity() {
 
     private fun showHome() {
 
-        currentScreen = Screen.HOME
+        navigation.navigateHome()
 
         chatScreen = null
         engineerScreen = null
@@ -158,7 +157,7 @@ class MainActivity : Activity() {
 
     private fun showModelScreen() {
 
-        currentScreen = Screen.MODEL
+        navigation.navigateTo(AliceNavigation.Screen.MODEL)
         engineerScreen = null
         chatScreen = null
 
@@ -337,7 +336,7 @@ class MainActivity : Activity() {
 
     private fun showChat() {
 
-        currentScreen = Screen.CHAT
+        navigation.navigateTo(AliceNavigation.Screen.CHAT)
         engineerScreen = null
         modelScreen = null
 
@@ -401,7 +400,7 @@ class MainActivity : Activity() {
     }
 
     private fun showEngineer() {
-        currentScreen = Screen.ENGINEER
+        navigation.navigateTo(AliceNavigation.Screen.ENGINEER)
         chatScreen = null
         modelScreen = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
