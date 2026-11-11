@@ -501,7 +501,7 @@ class MainActivity : Activity() {
                 }
             },
             onError = { error ->
-                val text = "Не удалось запустить локальную модель:\\n$error"
+                val text = "Не удалось запустить локальную модель:\n$error"
 
                 chatHistory.add(Pair(text, false))
 
