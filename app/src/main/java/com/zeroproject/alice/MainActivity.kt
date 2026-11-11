@@ -17,6 +17,7 @@ import com.zeroproject.alice.engineer.minecraft.AliceMinecraftEngineer
 import com.zeroproject.alice.memory.AliceMemory
 import com.zeroproject.alice.chat.AliceChatManager
 import com.zeroproject.alice.navigation.AliceNavigation
+import com.zeroproject.alice.ai.AliceAIState
 
 import java.io.File
 
@@ -42,9 +43,7 @@ class MainActivity : Activity() {
     private val isEngineerOpen get() = navigation.isEngineerOpen
     private var isDownloading = false
 
-    private var isInitializingAI = false
-    private var isGenerating = false
-    private var engineInitializationStarted = false
+    private val aiState = AliceAIState()
 
     private var lastBackPressedAt = 0L
 
@@ -381,7 +380,7 @@ class MainActivity : Activity() {
             initialStatus = getAIStatusText(),
 
             initialSendEnabled =
-                localEngine.isReady() && !isGenerating,
+                localEngine.isReady() && !aiState.isGenerating,
 
             onBackClick = {
                 showHome()
@@ -461,15 +460,8 @@ class MainActivity : Activity() {
 
     // СОСТОЯНИЕ ИИ
 
-    private fun getAIStatusText(): String {
-
-        return when {
-            isGenerating -> "●  ЭЛИС ДУМАЕТ..."
-            localEngine.isReady() -> "●  ЛОКАЛЬНЫЙ ИИ АКТИВЕН"
-            isInitializingAI -> "●  ЗАГРУЗКА ЛОКАЛЬНОГО ИИ..."
-            else -> "●  ОЖИДАНИЕ ИИ"
-        }
-    }
+    private fun getAIStatusText(): String =
+        aiState.statusText(localEngine.isReady())
 
     private fun updateChatControls() {
 
@@ -480,7 +472,7 @@ class MainActivity : Activity() {
         )
 
         chatScreen?.setSendEnabled(
-            localEngine.isReady() && !isGenerating
+            localEngine.isReady() && !aiState.isGenerating
         )
     }
 
@@ -494,7 +486,7 @@ class MainActivity : Activity() {
             return
         }
 
-        if (isInitializingAI || engineInitializationStarted) {
+        if (aiState.isInitializing || aiState.initializationStarted) {
             updateChatControls()
             return
         }
@@ -517,8 +509,7 @@ class MainActivity : Activity() {
             return
         }
 
-        isInitializingAI = true
-        engineInitializationStarted = true
+        aiState.beginInitialization()
 
         updateChatControls()
 
@@ -526,7 +517,7 @@ class MainActivity : Activity() {
 
             onReady = {
 
-                isInitializingAI = false
+                aiState.initializationSucceeded()
                 if (isEngineerOpen) engineerScreen?.setStatus("Локальный ИИ готов к разработке")
 
                 val text =
@@ -542,8 +533,7 @@ class MainActivity : Activity() {
 
             onError = { error ->
 
-                isInitializingAI = false
-                engineInitializationStarted = false
+                aiState.initializationFailed()
 
                 val text =
                     "Не удалось запустить локальную модель:\n$error"
@@ -581,7 +571,7 @@ class MainActivity : Activity() {
             return
         }
 
-        if (isGenerating) return
+        if (aiState.isGenerating) return
 
         // Показываем сообщение пользователя
 
@@ -590,7 +580,7 @@ class MainActivity : Activity() {
 
         // Показываем индикатор генерации
 
-        isGenerating = true
+        aiState.beginGeneration()
 
         chatHistory.add(
             Pair("Элис думает...", false)
@@ -612,7 +602,7 @@ class MainActivity : Activity() {
 
             onResponse = { response ->
 
-                isGenerating = false
+                aiState.finishGeneration()
 
                 if (chatHistory.isNotEmpty() &&
                     chatHistory.last().first == "Элис думает..."
@@ -636,7 +626,7 @@ class MainActivity : Activity() {
 
             onError = { error ->
 
-                isGenerating = false
+                aiState.finishGeneration()
 
                 if (chatHistory.isNotEmpty() &&
                     chatHistory.last().first == "Элис думает..."
