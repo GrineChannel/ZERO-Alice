@@ -17,7 +17,7 @@ import com.zeroproject.alice.engineer.minecraft.AliceMinecraftEngineer
 import com.zeroproject.alice.memory.AliceMemory
 import com.zeroproject.alice.chat.AliceChatManager
 import com.zeroproject.alice.navigation.AliceNavigation
-import com.zeroproject.alice.ai.AliceAIState
+import com.zeroproject.alice.ai.AliceAIManager
 
 import java.io.File
 
@@ -43,7 +43,8 @@ class MainActivity : Activity() {
     private val isEngineerOpen get() = navigation.isEngineerOpen
     private var isDownloading = false
 
-    private val aiState = AliceAIState()
+    private lateinit var aiManager: AliceAIManager
+    private val aiState get() = aiManager.state
 
     private var lastBackPressedAt = 0L
 
@@ -52,6 +53,11 @@ class MainActivity : Activity() {
 
         modelDownloader = AliceModelDownloader(this)
         localEngine = AliceLocalEngine(this)
+        aiManager = AliceAIManager(
+            File(filesDir, "gemma-4-E2B-it.litertlm"),
+            modelDownloader,
+            localEngine
+        )
 
         aliceMemory = AliceMemory(this)
         chatManager = AliceChatManager(
@@ -480,44 +486,8 @@ class MainActivity : Activity() {
 
     private fun initializeAI() {
 
-        if (localEngine.isReady()) {
-            updateChatControls()
-            if (isEngineerOpen) engineerScreen?.setStatus("Локальный ИИ готов к разработке")
-            return
-        }
-
-        if (aiState.isInitializing || aiState.initializationStarted) {
-            updateChatControls()
-            return
-        }
-
-        val modelFile = File(
-            filesDir,
-            "gemma-4-E2B-it.litertlm"
-        )
-
-        if (!modelDownloader.isModelDownloaded() || !modelFile.exists()) {
-
-            val text =
-                "Я пока не могу запуститься: модель Gemma не найдена. Открой раздел «Модель ИИ» и проверь загрузку."
-
-            chatHistory.add(Pair(text, false))
-            chatScreen?.addMessage(text, false)
-
-            updateChatControls()
-            if (isEngineerOpen) engineerScreen?.setStatus(text)
-            return
-        }
-
-        aiState.beginInitialization()
-
-        updateChatControls()
-
-        localEngine.initialize(
-
+        val result = aiManager.start(
             onReady = {
-
-                aiState.initializationSucceeded()
                 if (isEngineerOpen) engineerScreen?.setStatus("Локальный ИИ готов к разработке")
 
                 val text =
@@ -530,23 +500,14 @@ class MainActivity : Activity() {
                     updateChatControls()
                 }
             },
-
             onError = { error ->
-
-                aiState.initializationFailed()
-
-                val text =
-                    "Не удалось запустить локальную модель:\n$error"
+                val text = "Не удалось запустить локальную модель:\\n$error"
 
                 chatHistory.add(Pair(text, false))
 
                 if (isChatOpen) {
                     chatScreen?.addMessage(text, false)
-
-                    chatScreen?.updateStatus(
-                        "●  ОШИБКА ЗАПУСКА ИИ"
-                    )
-
+                    chatScreen?.updateStatus("●  ОШИБКА ЗАПУСКА ИИ")
                     updateChatControls()
                 }
 
@@ -554,6 +515,24 @@ class MainActivity : Activity() {
                 showMessage("Ошибка запуска Gemma: $error")
             }
         )
+
+        when (result) {
+            AliceAIManager.StartResult.READY -> {
+                updateChatControls()
+                if (isEngineerOpen) engineerScreen?.setStatus("Локальный ИИ готов к разработке")
+            }
+            AliceAIManager.StartResult.ALREADY_STARTING -> updateChatControls()
+            AliceAIManager.StartResult.MODEL_MISSING -> {
+                val text =
+                    "Я пока не могу запуститься: модель Gemma не найдена. Открой раздел «Модель ИИ» и проверь загрузку."
+
+                chatHistory.add(Pair(text, false))
+                chatScreen?.addMessage(text, false)
+                updateChatControls()
+                if (isEngineerOpen) engineerScreen?.setStatus(text)
+            }
+            AliceAIManager.StartResult.STARTED -> updateChatControls()
+        }
     }
 
     // ОТПРАВКА СООБЩЕНИЯ ЧЕРЕЗ CHAT MANAGER
