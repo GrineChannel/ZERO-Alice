@@ -42,8 +42,9 @@ class AliceMemory(context: Context) {
         )
     }
 
-    // Получение истории сообщений.
-
+    // Возвращаем последние сообщения в хронологическом порядке.
+    // Ранее запрос id ASC с LIMIT возвращал самые старые записи,
+    // поэтому новые сообщения пропадали из контекста после 5000 записей.
     fun getMessages(limit: Int = 500): List<AliceMessage> {
         val result = mutableListOf<AliceMessage>()
 
@@ -54,7 +55,7 @@ class AliceMemory(context: Context) {
             null,
             null,
             null,
-            "id ASC",
+            "id DESC",
             limit.coerceIn(1, 5000).toString()
         )
 
@@ -62,23 +63,16 @@ class AliceMemory(context: Context) {
             while (it.moveToNext()) {
                 result.add(
                     AliceMessage(
-                        id = it.getLong(
-                            it.getColumnIndexOrThrow("id")
-                        ),
-                        role = it.getString(
-                            it.getColumnIndexOrThrow("role")
-                        ),
-                        content = it.getString(
-                            it.getColumnIndexOrThrow("content")
-                        ),
-                        timestamp = it.getLong(
-                            it.getColumnIndexOrThrow("timestamp")
-                        )
+                        id = it.getLong(it.getColumnIndexOrThrow("id")),
+                        role = it.getString(it.getColumnIndexOrThrow("role")),
+                        content = it.getString(it.getColumnIndexOrThrow("content")),
+                        timestamp = it.getLong(it.getColumnIndexOrThrow("timestamp"))
                     )
                 )
             }
         }
 
+        result.reverse()
         return result
     }
 
