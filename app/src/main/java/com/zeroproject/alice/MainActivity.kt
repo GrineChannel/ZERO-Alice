@@ -700,8 +700,11 @@ class MainActivity : Activity() {
             chatScreen?.setMessages(chatHistory)
             return
         }
-        if (lowerCommand.startsWith("разработай minecraft элис ")) {
-            val args = command.substring("разработай minecraft элис ".length)
+        if (lowerCommand.startsWith("разработай minecraft элис ") ||
+            lowerCommand.startsWith("предпросмотр minecraft элис ")) {
+            val previewOnly = lowerCommand.startsWith("предпросмотр minecraft элис ")
+            val commandPrefix = if (previewOnly) "предпросмотр minecraft элис " else "разработай minecraft элис "
+            val args = command.substring(commandPrefix.length)
             val separator = args.indexOf(" :: ")
             val prefix = if (separator > 0) args.substring(0, separator).trim() else ""
             val goal = if (separator > 0) args.substring(separator + 4).trim() else ""
@@ -724,11 +727,12 @@ class MainActivity : Activity() {
             }
             val project = projects.single()
             engineerBusy = true
-            chatHistory.add(Pair("Запускаю разработку: ${project.name}.", false))
+            chatHistory.add(Pair(if (previewOnly) "Готовлю предварительные файлы: ${project.name}." else "Запускаю разработку: ${project.name}.", false))
             chatScreen?.setMessages(chatHistory)
             minecraftEngineer.develop(
                 projectId = project.id,
                 goal = goal,
+                previewOnly = previewOnly,
                 onProgress = { progress ->
                     runOnUiThread {
                         if (isChatOpen) {
@@ -739,7 +743,7 @@ class MainActivity : Activity() {
                 onResult = { result ->
                     runOnUiThread {
                         engineerBusy = false
-                        chatHistory.add(Pair("Разработка завершена: ${result.project.name}. Проверка: ${result.testReport.status}.", false))
+                        chatHistory.add(Pair(if (previewOnly) "Предварительные файлы сохранены: ${result.project.name}. Оригиналы не изменены." else "Разработка завершена: ${result.project.name}. Проверка: ${result.testReport.status}.", false))
                         if (isChatOpen) chatScreen?.setMessages(chatHistory)
                     }
                 },
