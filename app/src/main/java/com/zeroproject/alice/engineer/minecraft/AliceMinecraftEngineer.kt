@@ -226,6 +226,13 @@ class AliceMinecraftEngineer(
                             return@generateFiles
                         }
 
+                        // Compare first, then keep the existing backup-backed write path.
+                        val preview = fileWriter.previewChanges(
+                            projectId = project.id,
+                            files = files
+                        )
+                        onProgress(preview)
+
                         fileWriter.writeFiles(
                             projectId = project.id,
                             files = files
