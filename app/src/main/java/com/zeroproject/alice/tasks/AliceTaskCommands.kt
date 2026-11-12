@@ -4,7 +4,10 @@ package com.zeroproject.alice.tasks
  * Explicit commands for a task plan. Marking a step done records progress;
  * it does not execute the step or grant permission to perform actions.
  */
-class AliceTaskCommands(private val store: AliceTaskStore) {
+class AliceTaskCommands(
+    private val store: AliceTaskStore,
+    private val executor: AliceTaskExecutor? = null
+) {
 
     fun handle(input: String): String? {
         val text = input.trim()
@@ -30,6 +33,15 @@ class AliceTaskCommands(private val store: AliceTaskStore) {
             } catch (error: Exception) {
                 "Не удалось создать задачу: ${error.message}"
             }
+        }
+
+        if (lower.startsWith("выполни шаг элис ")) {
+            val prefix = text.substring("выполни шаг элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            return executor?.executeNext(matches.first().id)
+                ?: "Исполнитель задач пока недоступен."
         }
 
         if (lower.startsWith("шаг задачи элис ")) {
