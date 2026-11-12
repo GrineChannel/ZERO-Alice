@@ -654,6 +654,23 @@ class MainActivity : Activity() {
             chatScreen?.setMessages(chatHistory)
             return
         }
+        if (lowerCommand.startsWith("проверь файлы minecraft элис ")) {
+            val prefix = command.substring("проверь файлы minecraft элис ".length).trim()
+            val matches = if (prefix.length >= 4) minecraftEngineer.projectManager.listProjects().filter {
+                it.id.startsWith(prefix, ignoreCase = true)
+            } else emptyList()
+            val reply = if (matches.size != 1) {
+                "Укажи однозначный ID Minecraft-проекта (минимум 4 символа)."
+            } else try {
+                minecraftEngineer.projectManager.inspectProjectFiles(matches.single().id)
+            } catch (error: Exception) {
+                "Ошибка проверки файлов: ${error.message}"
+            }
+            chatHistory.add(Pair(message, true))
+            chatHistory.add(Pair(reply, false))
+            chatScreen?.setMessages(chatHistory)
+            return
+        }
         if (lowerCommand.startsWith("подготовь повтор minecraft элис ")) {
             val prefix = command.substring("подготовь повтор minecraft элис ".length).trim()
             val matches = if (prefix.length >= 4) minecraftEngineer.taskCore.getTasks().filter {
