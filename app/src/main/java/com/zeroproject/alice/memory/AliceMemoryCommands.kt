@@ -60,6 +60,9 @@ class AliceMemoryCommands(
         }
 
         val (key, value) = createFact(statement)
+        // An explicit "remember" request overrides a previous block
+        // for this category and the exact value supplied by the user.
+        memory.allowFactAgain(key, value)
         val result = memory.saveFact(key, value)
 
         return if (result != -1L) {
