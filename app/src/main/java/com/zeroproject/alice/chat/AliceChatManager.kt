@@ -137,13 +137,14 @@ class AliceChatManager(
 
         // Сначала проверяем команды управления памятью.
 
-        val commandResponse = memoryCommands.handle(text)
+        val commandResponse = memoryManager.executeMemoryCommand {
+            memoryCommands.handle(text)
+        }
 
         if (commandResponse != null) {
 
-            // Discard pending extraction from conversations preceding this
-            // memory command, especially after "forget everything".
-            memoryManager.invalidatePendingAnalyses()
+            // The memory command and cancellation were serialized with
+            // background fact writes inside AliceMemoryManager.
 
             // Notify the UI to reload the persisted history after changes.
             onHistoryChanged?.invoke()
