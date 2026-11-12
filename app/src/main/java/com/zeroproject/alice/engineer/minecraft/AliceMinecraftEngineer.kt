@@ -33,6 +33,8 @@ class AliceMinecraftEngineer(
         projectManager
     )
 
+    val interruptedTasksOnStartup: Int = taskCore.markInterruptedTasks()
+
     // Используем общий движок из MainActivity.
     // Вторую копию Gemma не создаём.
     val localEngine = sharedEngine
