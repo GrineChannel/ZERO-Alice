@@ -148,6 +148,42 @@ class MinecraftProjectManager(context: Context) {
         }
     }
 
+    /**
+     * Read-only list of staged generation batches. Never scans outside backups/previews.
+     */
+    @Synchronized
+    fun listPreviewBatches(projectId: String): String {
+        val project = requireProject(projectId)
+        val root = project.directory.canonicalFile
+        val previews = File(root, "backups/previews").canonicalFile
+        require(previews.path.startsWith(root.path + File.separator)) {
+            "Недопустимая папка предварительных версий"
+        }
+        if (!previews.isDirectory) return "Предварительных версий пока нет."
+        val batches = previews.listFiles()
+            ?.filter { it.isDirectory && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+            ?.sortedByDescending { it.lastModified() }
+            ?.take(20)
+            .orEmpty()
+        if (batches.isEmpty()) return "Предварительных версий пока нет."
+        return buildString {
+            append("Предварительные версии проекта ${project.name}:\n")
+            for (batch in batches) {
+                val safeBatch = batch.canonicalFile
+                if (!safeBatch.path.startsWith(previews.path + File.separator)) continue
+                val sample = safeBatch.walkTopDown().onEnter {
+                    it.canonicalPath.startsWith(safeBatch.path) &&
+                        !java.nio.file.Files.isSymbolicLink(it.toPath())
+                }.filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+                    .take(31).toList()
+                append("${batch.name.take(8)} | файлов: ${sample.size.coerceAtMost(30)}")
+                if (sample.size > 30) append("+")
+                append("\n")
+            }
+            append("Основные файлы не изменены.")
+        }
+    }
+
     @Synchronized
     fun writeFile(
         projectId: String,
