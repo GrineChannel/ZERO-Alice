@@ -86,6 +86,37 @@ class AliceMemory(context: Context) {
         )
     }
 
+    // Remove old messages containing an explicitly forgotten fact value.
+    // The whole message is removed to avoid retaining partial private text.
+    fun deleteMessagesContaining(terms: Collection<String>): Int {
+        val normalized = terms.map { it.trim() }
+            .filter { it.length >= 3 && !it.startsWith("key:", ignoreCase = true) }
+            .distinct()
+        if (normalized.isEmpty()) return 0
+
+        val db = helper.writableDatabase
+        val ids = mutableListOf<Long>()
+        db.beginTransaction()
+        try {
+            db.query("messages", arrayOf("id", "content"),
+                null, null, null, null, null).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val content = cursor.getString(1)
+                    if (normalized.any { content.contains(it, ignoreCase = true) }) {
+                        ids.add(cursor.getLong(0))
+                    }
+                }
+            }
+            for (id in ids) {
+                db.delete("messages", "id = ?", arrayOf(id.toString()))
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        return ids.size
+    }
+
     // Сохранение или обновление факта.
 
     fun saveFact(key: String, value: String): Long {
