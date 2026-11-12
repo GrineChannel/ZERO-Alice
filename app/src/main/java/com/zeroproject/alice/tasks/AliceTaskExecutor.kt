@@ -16,6 +16,12 @@ class AliceTaskExecutor(
     private val minecraftProjects: MinecraftProjectManager? = null,
     private val launchMinecraft: ((String, String, (Boolean, String) -> Unit) -> Boolean)? = null
 ) {
+    companion object {
+        // Shared by executor instances created for each chat command.
+        private val runningMinecraftTasks = mutableSetOf<String>()
+        private val runningLock = Any()
+    }
+
     /**
      * Runs at most five steps per explicit user request. A failed or unsupported
      * step stops the batch without marking it complete. A later request resumes
@@ -65,22 +71,37 @@ class AliceTaskExecutor(
             val goal = args.substring(separator + 4).trim()
             if (goal.isBlank()) return "Цель разработки не указана."
             val launcher = launchMinecraft ?: return "Запуск Minecraft-разработки недоступен."
-            val accepted = launcher(projectId, goal) { success, details ->
-                try {
-                    if (success) {
-                        val current = store.list().firstOrNull { it.id == task.id }
-                        if (current != null && current.status != "cancelled" &&
-                            current.completedSteps == task.completedSteps) {
-                            store.advance(task.id)
+            val reserved = synchronized(runningLock) { runningMinecraftTasks.add(task.id) }
+            if (!reserved) return "Minecraft-разработка по этой задаче уже выполняется."
+            return try {
+                val accepted = launcher(projectId, goal) { success, details ->
+                    try {
+                        if (success) {
+                            val current = store.list().firstOrNull { it.id == task.id }
+                            if (current != null && current.status != "cancelled" &&
+                                current.completedSteps == task.completedSteps) {
+                                store.advance(task.id)
+                            }
                         }
+                        log?.append(task.id, task.completedSteps, success, details)
+                    } catch (_: Exception) {
+                        // Callback must not crash the application.
+                    } finally {
+                        synchronized(runningLock) { runningMinecraftTasks.remove(task.id) }
                     }
-                    log?.append(task.id, task.completedSteps, success, details)
-                } catch (_: Exception) {
-                    // Keep the engineering callback from crashing the UI.
                 }
+                if (!accepted) {
+                    synchronized(runningLock) { runningMinecraftTasks.remove(task.id) }
+                    "Запуск Minecraft-разработки отклонён. Шаг не завершён."
+                } else {
+                    "Разработка Minecraft запущена. Прогресс задачи обновится после результата."
+                }
+            } catch (error: Exception) {
+                synchronized(runningLock) { runningMinecraftTasks.remove(task.id) }
+                val message = "Не удалось запустить Minecraft-разработку: ${error.message}"
+                log?.append(task.id, task.completedSteps, false, message)
+                message
             }
-            return if (accepted) "Разработка Minecraft запущена. Прогресс задачи обновится после результата."
-            else "Запуск Minecraft-разработки отклонён. Шаг не завершён."
         }
         return try {
             val result = when {
