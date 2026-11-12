@@ -141,6 +141,10 @@ class AliceChatManager(
 
         if (commandResponse != null) {
 
+            // Discard pending extraction from conversations preceding this
+            // memory command, especially after "forget everything".
+            memoryManager.invalidatePendingAnalyses()
+
             // Notify the UI to reload the persisted history after changes.
             onHistoryChanged?.invoke()
 
