@@ -1,6 +1,7 @@
 package com.zeroproject.alice.tasks
 
 import com.zeroproject.alice.files.AliceWorkspace
+import com.zeroproject.alice.files.AliceFileRevision
 
 /**
  * Executes exactly one explicitly requested task step.
@@ -9,7 +10,8 @@ import com.zeroproject.alice.files.AliceWorkspace
 class AliceTaskExecutor(
     private val store: AliceTaskStore,
     private val workspace: AliceWorkspace,
-    private val log: AliceTaskLog? = null
+    private val log: AliceTaskLog? = null,
+    private val revisions: AliceFileRevision? = null
 ) {
     /**
      * Runs at most five steps per explicit user request. A failed or unsupported
@@ -23,6 +25,12 @@ class AliceTaskExecutor(
             val before = store.list().firstOrNull { it.id == taskId }
                 ?: return "Задача не найдена."
             if (before.status == "completed" || before.status == "cancelled") break
+            // Batch execution never overwrites existing files or performs undo.
+            val pending = before.steps.getOrNull(before.completedSteps)?.trim()?.lowercase().orEmpty()
+            if (pending.startsWith("замени файл элис ") || pending.startsWith("откати файл элис ")) {
+                messages.add("Шаг изменения существующего файла требует отдельной команды «выполни шаг элис ID».")
+                break
+            }
             val result = executeNext(taskId)
             messages.add(result)
             val after = store.list().firstOrNull { it.id == taskId }
@@ -65,6 +73,23 @@ class AliceTaskExecutor(
                     val content = args.substring(separator + 4)
                     workspace.writeText(path, content, overwrite = false)
                     "Создан файл: $path"
+                }
+                lower.startsWith("предпросмотр замены элис ") ||
+                    lower.startsWith("замени файл элис ") -> {
+                    val preview = lower.startsWith("предпросмотр замены элис ")
+                    val prefix = if (preview) "предпросмотр замены элис " else "замени файл элис "
+                    val args = step.substring(prefix.length)
+                    val separator = args.indexOf(" :: ")
+                    require(separator > 0) { "Укажи путь и содержимое через :: " }
+                    val path = args.substring(0, separator).trim()
+                    val content = args.substring(separator + 4)
+                    val editor = revisions ?: return "Редактор файлов недоступен."
+                    if (preview) editor.preview(path, content)
+                    else editor.replace(path, content)
+                }
+                lower.startsWith("откати файл элис ") -> {
+                    val editor = revisions ?: return "Редактор файлов недоступен."
+                    editor.undo(step.substring("откати файл элис ".length).trim())
                 }
                 else -> {
                     val message = "Этот шаг пока не поддерживается исполнителем: $step"
