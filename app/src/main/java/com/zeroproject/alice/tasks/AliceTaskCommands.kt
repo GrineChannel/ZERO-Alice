@@ -22,6 +22,26 @@ class AliceTaskCommands(
             }
         }
 
+        if (lower.startsWith("создай minecraft задачу элис ")) {
+            val specification = text.substring("создай minecraft задачу элис ".length)
+            val separator = specification.indexOf(" :: ")
+            if (separator < 4) {
+                return "Формат: создай minecraft задачу элис ID :: цель разработки"
+            }
+            val projectId = specification.substring(0, separator).trim()
+            val goal = specification.substring(separator + 4).trim()
+            if (goal.isBlank()) return "Укажи цель разработки Minecraft."
+            return try {
+                val task = store.create(
+                    "Minecraft Bedrock: $goal",
+                    listOf("разработай minecraft элис $projectId :: $goal")
+                )
+                "План Minecraft создан: ${task.id.take(8)}. Для запуска используй «выполни шаг элис ${task.id.take(8)}»."
+            } catch (error: Exception) {
+                "Не удалось создать Minecraft-план: ${error.message}"
+            }
+        }
+
         if (lower.startsWith("создай задачу элис ")) {
             val specification = text.substring("создай задачу элис ".length)
             val parts = specification.split(" :: ").map { it.trim() }
