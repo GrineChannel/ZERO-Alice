@@ -77,6 +77,7 @@ class AliceMinecraftEngineer(
         goal: String,
         minecraftVersion: String = "1.21.43",
         scriptApiVersion: String = "1.16.0-beta",
+        previewOnly: Boolean = false,
         onProgress: (String) -> Unit,
         onResult: (MinecraftEngineerResult) -> Unit,
         onError: (String) -> Unit
@@ -140,6 +141,7 @@ class AliceMinecraftEngineer(
                         goal = goal,
                         plan = plan,
                         stepIndex = 0,
+                        previewOnly = previewOnly,
                         minecraftVersion = minecraftVersion,
                         scriptApiVersion = scriptApiVersion,
                         onProgress = onProgress,
@@ -167,6 +169,7 @@ class AliceMinecraftEngineer(
         goal: String,
         plan: EngineerPlan,
         stepIndex: Int,
+        previewOnly: Boolean,
         minecraftVersion: String,
         scriptApiVersion: String,
         onProgress: (String) -> Unit,
@@ -179,6 +182,7 @@ class AliceMinecraftEngineer(
                 taskId,
                 project,
                 plan,
+                previewOnly,
                 onProgress,
                 onResult,
                 onError
@@ -240,13 +244,16 @@ class AliceMinecraftEngineer(
                         )
                         onProgress(staged)
 
-                        fileWriter.writeFiles(
-                            projectId = project.id,
-                            files = files
-                        )
+                        if (!previewOnly) {
+                            fileWriter.writeFiles(
+                                projectId = project.id,
+                                files = files
+                            )
+                        }
 
                         onProgress(
-                            "Сохранено файлов: ${files.size}"
+                            if (previewOnly) "Подготовлено предварительных файлов: ${files.size}"
+                            else "Сохранено файлов: ${files.size}"
                         )
 
                         processStep(
@@ -255,6 +262,7 @@ class AliceMinecraftEngineer(
                             goal = goal,
                             plan = plan,
                             stepIndex = stepIndex + 1,
+                            previewOnly = previewOnly,
                             minecraftVersion = minecraftVersion,
                             scriptApiVersion = scriptApiVersion,
                             onProgress = onProgress,
@@ -288,10 +296,40 @@ class AliceMinecraftEngineer(
         taskId: String,
         project: MinecraftProject,
         plan: EngineerPlan,
+        previewOnly: Boolean,
         onProgress: (String) -> Unit,
         onResult: (MinecraftEngineerResult) -> Unit,
         onError: (String) -> Unit
     ) {
+
+        if (previewOnly) {
+            try {
+                taskCore.updateTaskStatus(taskId, EngineerTaskStatus.VALIDATING, "Предварительные файлы сохранены")
+                taskCore.updateTaskStatus(taskId, EngineerTaskStatus.BUILDING, "Сборка пропущена в режиме предпросмотра")
+                taskCore.updateTaskStatus(taskId, EngineerTaskStatus.TESTING, "Тестирование дополнения пропущено")
+                taskCore.updateProgress(taskId, 100, "Предварительная генерация завершена")
+                val completed = taskCore.updateTaskStatus(taskId, EngineerTaskStatus.COMPLETED, "Предварительные версии сохранены; оригиналы не изменены")
+                onResult(MinecraftEngineerResult(
+                    task = completed,
+                    project = project,
+                    plan = plan,
+                    testReport = MinecraftTestReport(
+                        projectName = project.name,
+                        status = MinecraftTestStatus.WARNING,
+                        steps = listOf(MinecraftTestStep(
+                            "Предварительная генерация",
+                            MinecraftTestStatus.WARNING,
+                            "Основные файлы не изменены; сборка и тестирование не выполнялись"
+                        )),
+                        addonFile = null,
+                        completedAt = System.currentTimeMillis()
+                    )
+                ))
+            } catch (error: Exception) {
+                failTask(taskId, error.message ?: "Ошибка предварительной генерации", onError)
+            }
+            return
+        }
 
         try {
             taskCore.updateTaskStatus(
