@@ -2,6 +2,7 @@ package com.zeroproject.alice.tools
 
 import com.zeroproject.alice.device.AliceDeviceActions
 import com.zeroproject.alice.files.AliceWorkspace
+import com.zeroproject.alice.files.AliceFileRevision
 import com.zeroproject.alice.tasks.AliceTaskCommands
 
 /**
@@ -11,7 +12,8 @@ import com.zeroproject.alice.tasks.AliceTaskCommands
 class AliceToolRegistry(
     private val deviceActions: AliceDeviceActions,
     private val workspace: AliceWorkspace? = null,
-    private val taskCommands: AliceTaskCommands? = null
+    private val taskCommands: AliceTaskCommands? = null,
+    private val fileRevision: AliceFileRevision? = null
 ) {
     data class Tool(
         val id: String,
@@ -41,6 +43,37 @@ class AliceToolRegistry(
         }
         val command = text.trim()
         val lower = command.lowercase()
+
+        if (lower.startsWith("предпросмотр замены элис ") ||
+            lower.startsWith("замени файл элис ")) {
+            val preview = lower.startsWith("предпросмотр замены элис ")
+            val prefix = if (preview) "предпросмотр замены элис " else "замени файл элис "
+            val argument = command.substring(prefix.length)
+            val separator = argument.indexOf(" :: ")
+            if (separator < 1) {
+                return Result(true, false, "Формат: ${prefix}путь/имя.txt :: новый текст")
+            }
+            val path = argument.substring(0, separator).trim()
+            val replacement = argument.substring(separator + 4)
+            return try {
+                val editor = fileRevision ?: return Result(true, false, "Редактор недоступен")
+                val reply = if (preview) editor.preview(path, replacement)
+                    else editor.replace(path, replacement)
+                Result(true, true, reply)
+            } catch (error: Exception) {
+                Result(true, false, "Ошибка редактирования: ${error.message}")
+            }
+        }
+
+        if (lower.startsWith("откати файл элис ")) {
+            val path = command.substring("откати файл элис ".length).trim()
+            return try {
+                val editor = fileRevision ?: return Result(true, false, "Редактор недоступен")
+                Result(true, true, editor.undo(path))
+            } catch (error: Exception) {
+                Result(true, false, "Ошибка отката: ${error.message}")
+            }
+        }
 
         if (lower == "покажи файлы элис" || lower == "список файлов элис") {
             return withWorkspace { space ->
