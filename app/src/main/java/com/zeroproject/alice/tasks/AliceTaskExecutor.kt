@@ -13,7 +13,8 @@ class AliceTaskExecutor(
     private val workspace: AliceWorkspace,
     private val log: AliceTaskLog? = null,
     private val revisions: AliceFileRevision? = null,
-    private val minecraftProjects: MinecraftProjectManager? = null
+    private val minecraftProjects: MinecraftProjectManager? = null,
+    private val launchMinecraft: ((String, String, (Boolean, String) -> Unit) -> Boolean)? = null
 ) {
     /**
      * Runs at most five steps per explicit user request. A failed or unsupported
@@ -29,8 +30,8 @@ class AliceTaskExecutor(
             if (before.status == "completed" || before.status == "cancelled") break
             // Batch execution never overwrites existing files or performs undo.
             val pending = before.steps.getOrNull(before.completedSteps)?.trim()?.lowercase().orEmpty()
-            if (pending.startsWith("замени файл элис ") || pending.startsWith("откати файл элис ")) {
-                messages.add("Шаг изменения существующего файла требует отдельной команды «выполни шаг элис ID».")
+            if (pending.startsWith("замени файл элис ") || pending.startsWith("откати файл элис ") || pending.startsWith("разработай minecraft элис ")) {
+                messages.add("Этот шаг требует отдельной команды «выполни шаг элис ID».")
                 break
             }
             val result = executeNext(taskId)
@@ -56,6 +57,31 @@ class AliceTaskExecutor(
         val step = task.steps.getOrNull(task.completedSteps)
             ?: return "Все шаги уже отмечены."
         val lower = step.lowercase().trim()
+        if (lower.startsWith("разработай minecraft элис ")) {
+            val args = step.substring("разработай minecraft элис ".length)
+            val separator = args.indexOf(" :: ")
+            if (separator < 4) return "Формат шага: разработай minecraft элис ID :: цель"
+            val projectId = args.substring(0, separator).trim()
+            val goal = args.substring(separator + 4).trim()
+            if (goal.isBlank()) return "Цель разработки не указана."
+            val launcher = launchMinecraft ?: return "Запуск Minecraft-разработки недоступен."
+            val accepted = launcher(projectId, goal) { success, details ->
+                try {
+                    if (success) {
+                        val current = store.list().firstOrNull { it.id == task.id }
+                        if (current != null && current.status != "cancelled" &&
+                            current.completedSteps == task.completedSteps) {
+                            store.advance(task.id)
+                        }
+                    }
+                    log?.append(task.id, task.completedSteps, success, details)
+                } catch (_: Exception) {
+                    // Keep the engineering callback from crashing the UI.
+                }
+            }
+            return if (accepted) "Разработка Minecraft запущена. Прогресс задачи обновится после результата."
+            else "Запуск Minecraft-разработки отклонён. Шаг не завершён."
+        }
         return try {
             val result = when {
                 lower.startsWith("создай папку элис ") -> {
