@@ -21,6 +21,26 @@ class AliceDeviceActions(private val context: Context) {
         Action("browser", "Открыть браузер")
     )
 
+    // Only unambiguous commands are routed to Android. All other text
+    // remains ordinary chat, never an inferred device action.
+    fun resolveCommand(message: String): String? {
+        val command = message.trim().lowercase()
+            .replace(Regex("[.!?]+$"), "")
+            .trim()
+        return when (command) {
+            "открой настройки", "открой настройки телефона",
+            "открыть настройки телефона" -> "settings"
+            "открой wi-fi", "открой wifi", "открой вайфай",
+            "открой настройки wi-fi", "открой настройки wifi" -> "wifi"
+            "открой bluetooth", "открой блютуз",
+            "открой настройки bluetooth" -> "bluetooth"
+            "открой разрешения элис", "открой разрешения alice",
+            "открой настройки приложения" -> "app_settings"
+            "открой браузер", "открыть браузер" -> "browser"
+            else -> null
+        }
+    }
+
     fun execute(id: String): Boolean {
         val intent = when (id) {
             "settings" -> Intent(Settings.ACTION_SETTINGS)
