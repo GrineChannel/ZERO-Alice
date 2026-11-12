@@ -35,6 +35,15 @@ class AliceTaskCommands(
             }
         }
 
+        if (lower.startsWith("продолжи задачу элис ")) {
+            val prefix = text.substring("продолжи задачу элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            return executor?.executeBatch(matches.first().id)
+                ?: "Исполнитель задач пока недоступен."
+        }
+
         if (lower.startsWith("выполни шаг элис ")) {
             val prefix = text.substring("выполни шаг элис ".length).trim()
             if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
