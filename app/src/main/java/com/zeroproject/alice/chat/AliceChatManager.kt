@@ -32,11 +32,26 @@ class AliceChatManager(
         }
     }
 
+    // Memory control commands are UI actions, not dialogue for the model.
+    // Older versions persisted them; exclude those old entries too.
+    private fun isMemoryControlMessage(content: String): Boolean {
+        val text = content.trim().lowercase()
+        return listOf(
+            "забудь ", "забудь всё", "забудь все",
+            "удали из памяти ", "очисти память",
+            "запомни ", "запомни,", "запомни:",
+            "сохрани ", "сохрани,", "сохрани:"
+        ).any { text.startsWith(it) }
+    }
+
     private fun buildPreviousContext(): String {
 
         val messages = memory.getMessages(5000)
             .takeLast(30)
-            .filterNot { isExcludedFromContext(it.content) }
+            .filterNot {
+                isExcludedFromContext(it.content) ||
+                    (it.role == "user" && isMemoryControlMessage(it.content))
+            }
 
         if (messages.isEmpty()) return ""
 
@@ -109,9 +124,8 @@ class AliceChatManager(
 
         if (commandResponse != null) {
 
-            memory.saveMessage("user", text)
-            memory.saveMessage("assistant", commandResponse)
-
+            // Do not persist commands or their replies: doing so would
+            // reintroduce forgotten values after a reset or restart.
             contextInjected = false
 
             // Memory changes must also invalidate Gemma's in-session chat.
