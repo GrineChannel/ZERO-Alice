@@ -164,7 +164,22 @@ class AliceMemoryCommands(
         }
 
         if (matches.isEmpty()) {
-            return "Я не нашла в памяти информацию по запросу: $query"
+            // No saved fact: support an explicit literal value from history.
+            // Never guess what "my city", "my name", etc. refers to.
+            if (aliases.containsKey(query) || query.length < 4) {
+                return "Не нашла сохранённого факта. Для удаления из истории укажи точное значение, например: Забудь Москва."
+            }
+
+            val foundInHistory = memory.getMessages(5000).any { entry ->
+                entry.content.contains(query, ignoreCase = true)
+            }
+            if (!foundInHistory) {
+                return "Не нашла указанное значение в сохранённых фактах или последних 5000 сообщениях."
+            }
+
+            memory.addForgottenTerms(listOf(query))
+            val deleted = memory.deleteMessagesContaining(listOf(query))
+            return "Удалила $deleted сообщений с указанным значением из истории и заблокировала его повторное автоматическое сохранение."
         }
 
         memory.addForgottenTerms(matches.flatMap { fact ->
