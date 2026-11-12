@@ -28,6 +28,56 @@ class AliceEngineerFileWriter(
         val previousContent: String?
     )
 
+    /**
+     * Read-only comparison of generated files with existing project files.
+     * Does not modify or create any file.
+     */
+    @Synchronized
+    fun previewChanges(
+        projectId: String,
+        files: List<EngineerGeneratedFile>
+    ): String {
+        require(files.isNotEmpty() && files.size <= MAX_FILES) {
+            "Некорректное количество файлов"
+        }
+        val project = projectManager.getProject(projectId)
+            ?: throw IllegalArgumentException("Minecraft-проект не найден")
+        val root = project.directory.canonicalFile
+        val seen = mutableSetOf<String>()
+        var added = 0
+        var modified = 0
+        var unchanged = 0
+        val lines = mutableListOf<String>()
+        for (generated in files) {
+            val path = generated.path.trim()
+            require(isSafeAddonPath(path) && seen.add(path)) {
+                "Недопустимый или повторяющийся путь: $path"
+            }
+            require(generated.content.length <= MAX_FILE_SIZE) {
+                "Слишком большой файл: $path"
+            }
+            val target = File(root, path).canonicalFile
+            require(target.path.startsWith(root.path + File.separator)) {
+                "Путь за пределами проекта: $path"
+            }
+            require(!target.isDirectory) { "Путь является папкой: $path" }
+            val state = when {
+                !target.exists() -> { added++; "НОВЫЙ" }
+                !target.isFile -> throw IllegalArgumentException("Недопустимый файл: $path")
+                target.readText(Charsets.UTF_8) == generated.content -> {
+                    unchanged++; "БЕЗ ИЗМЕНЕНИЙ"
+                }
+                else -> { modified++; "ИЗМЕНЁН" }
+            }
+            lines.add("$state | $path")
+        }
+        return buildString {
+            append("Предпросмотр Minecraft-файлов: новых $added, изменённых $modified, без изменений $unchanged.\\n")
+            append(lines.joinToString("\\n"))
+            append("\\nФайлы не изменены.")
+        }
+    }
+
     @Synchronized
     fun writeFiles(
         projectId: String,
