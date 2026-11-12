@@ -164,6 +164,39 @@ class AliceMemory(context: Context) {
         )
     }
 
+    fun getForgottenTerms(): List<String> {
+        val terms = mutableListOf<String>()
+        helper.readableDatabase.query(
+            "forgotten_terms", arrayOf("term"),
+            null, null, null, null, "id ASC"
+        ).use { cursor ->
+            while (cursor.moveToNext()) terms.add(cursor.getString(0))
+        }
+        return terms
+    }
+
+    fun addForgottenTerms(terms: Collection<String>) {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            for (term in terms) {
+                val normalized = term.trim().lowercase()
+                if (normalized.length < 3 || normalized.length > 500) continue
+                val values = ContentValues().apply { put("term", normalized) }
+                db.insertWithOnConflict(
+                    "forgotten_terms", null, values, SQLiteDatabase.CONFLICT_IGNORE
+                )
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    fun clearForgottenTerms() {
+        helper.writableDatabase.delete("forgotten_terms", null, null)
+    }
+
     // Закрытие базы данных.
 
     fun close() {
@@ -177,7 +210,7 @@ class AliceMemory(context: Context) {
             context,
             "alice_memory.db",
             null,
-            1
+            2
         ) {
 
         override fun onCreate(db: SQLiteDatabase) {
@@ -203,6 +236,11 @@ class AliceMemory(context: Context) {
                 )
                 """.trimIndent()
             )
+            db.execSQL(
+                "CREATE TABLE forgotten_terms (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "term TEXT NOT NULL UNIQUE)"
+            )
         }
 
         override fun onUpgrade(
@@ -210,7 +248,13 @@ class AliceMemory(context: Context) {
             oldVersion: Int,
             newVersion: Int
         ) {
-            // Миграции добавим при изменении структуры базы.
+            if (oldVersion < 2) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS forgotten_terms (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "term TEXT NOT NULL UNIQUE)"
+                )
+            }
         }
     }
 }
