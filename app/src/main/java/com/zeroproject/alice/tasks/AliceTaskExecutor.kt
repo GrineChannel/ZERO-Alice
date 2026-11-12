@@ -8,7 +8,8 @@ import com.zeroproject.alice.files.AliceWorkspace
  */
 class AliceTaskExecutor(
     private val store: AliceTaskStore,
-    private val workspace: AliceWorkspace
+    private val workspace: AliceWorkspace,
+    private val log: AliceTaskLog? = null
 ) {
     /**
      * Runs at most five steps per explicit user request. A failed or unsupported
@@ -32,7 +33,7 @@ class AliceTaskExecutor(
         return if (messages.isEmpty()) {
             "Задача завершена или отменена."
         } else {
-            messages.joinToString("\\n")
+            messages.joinToString("\n")
         }
     }
 
@@ -65,13 +66,20 @@ class AliceTaskExecutor(
                     workspace.writeText(path, content, overwrite = false)
                     "Создан файл: $path"
                 }
-                else -> return "Этот шаг пока не поддерживается исполнителем: $step"
+                else -> {
+                    val message = "Этот шаг пока не поддерживается исполнителем: $step"
+                    log?.append(task.id, task.completedSteps, false, message)
+                    return message
+                }
             }
             val updated = store.advance(task.id)
                 ?: return "$result. Но не удалось сохранить прогресс."
+            log?.append(task.id, task.completedSteps, true, result)
             "$result. Прогресс: ${updated.completedSteps}/${updated.steps.size}."
         } catch (error: Exception) {
-            "Шаг не выполнен: ${error.message}"
+            val message = "Шаг не выполнен: ${error.message}"
+            log?.append(task.id, task.completedSteps, false, message)
+            message
         }
     }
 }
