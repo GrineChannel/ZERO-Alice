@@ -2,6 +2,7 @@ package com.zeroproject.alice.tasks
 
 import com.zeroproject.alice.files.AliceWorkspace
 import com.zeroproject.alice.files.AliceFileRevision
+import com.zeroproject.alice.engineer.minecraft.MinecraftProjectManager
 
 /**
  * Executes exactly one explicitly requested task step.
@@ -11,7 +12,8 @@ class AliceTaskExecutor(
     private val store: AliceTaskStore,
     private val workspace: AliceWorkspace,
     private val log: AliceTaskLog? = null,
-    private val revisions: AliceFileRevision? = null
+    private val revisions: AliceFileRevision? = null,
+    private val minecraftProjects: MinecraftProjectManager? = null
 ) {
     /**
      * Runs at most five steps per explicit user request. A failed or unsupported
@@ -73,6 +75,13 @@ class AliceTaskExecutor(
                     val content = args.substring(separator + 4)
                     workspace.writeText(path, content, overwrite = false)
                     "Создан файл: $path"
+                }
+                lower.startsWith("создай minecraft проект элис ") -> {
+                    val name = step.substring("создай minecraft проект элис ".length).trim()
+                    require(name.isNotBlank()) { "Название Minecraft-проекта не указано" }
+                    val manager = minecraftProjects ?: return "Модуль Minecraft-проектов недоступен."
+                    val project = manager.createProject(name)
+                    "Создан Minecraft Bedrock проект: ${project.name} (ID: ${project.id})"
                 }
                 lower.startsWith("предпросмотр замены элис ") ||
                     lower.startsWith("замени файл элис ") -> {
