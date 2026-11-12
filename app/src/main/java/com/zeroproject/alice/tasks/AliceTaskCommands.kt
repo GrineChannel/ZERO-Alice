@@ -6,7 +6,8 @@ package com.zeroproject.alice.tasks
  */
 class AliceTaskCommands(
     private val store: AliceTaskStore,
-    private val executor: AliceTaskExecutor? = null
+    private val executor: AliceTaskExecutor? = null,
+    private val log: AliceTaskLog? = null
 ) {
 
     fun handle(input: String): String? {
@@ -32,6 +33,18 @@ class AliceTaskCommands(
                 "План создан: ${task.id.take(8)}. Шагов: ${task.steps.size}. Выполнение пока не запущено."
             } catch (error: Exception) {
                 "Не удалось создать задачу: ${error.message}"
+            }
+        }
+
+        if (lower.startsWith("журнал задачи элис ")) {
+            val prefix = text.substring("журнал задачи элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            val records = log?.recent(matches.first().id).orEmpty()
+            return if (records.isEmpty()) "Записей выполнения пока нет."
+            else records.joinToString("\n") {
+                "${if (it.success) "OK" else "ERROR"} | шаг ${it.stepIndex + 1} | ${it.message}"
             }
         }
 
