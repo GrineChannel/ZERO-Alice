@@ -21,10 +21,17 @@ class AliceChatManager(
     @Volatile
     private var contextInjected = false
 
+    private fun isExcludedFromContext(content: String): Boolean {
+        return memory.getForgottenTerms().any { term ->
+            content.contains(term, ignoreCase = true)
+        }
+    }
+
     private fun buildPreviousContext(): String {
 
         val messages = memory.getMessages(5000)
             .takeLast(30)
+            .filterNot { isExcludedFromContext(it.content) }
 
         if (messages.isEmpty()) return ""
 
@@ -50,7 +57,9 @@ class AliceChatManager(
 
     private fun buildMemoryContext(): String {
 
-        val facts = memory.getFacts()
+        val facts = memory.getFacts().filterNot {
+            isExcludedFromContext(it.key + " " + it.value)
+        }
 
         if (facts.isEmpty()) return ""
 
@@ -94,6 +103,7 @@ class AliceChatManager(
             memory.saveMessage("user", text)
             memory.saveMessage("assistant", commandResponse)
 
+            contextInjected = false
             onResponse(commandResponse)
             return
         }
