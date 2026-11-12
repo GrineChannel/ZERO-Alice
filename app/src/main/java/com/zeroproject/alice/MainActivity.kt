@@ -21,6 +21,7 @@ import com.zeroproject.alice.engineer.minecraft.AliceMinecraftEngineer
 import com.zeroproject.alice.device.AliceDeviceActions
 import com.zeroproject.alice.tools.AliceToolRegistry
 import com.zeroproject.alice.files.AliceWorkspace
+import com.zeroproject.alice.files.AliceFileRevision
 import com.zeroproject.alice.tasks.AliceTaskStore
 import com.zeroproject.alice.tasks.AliceTaskCommands
 import com.zeroproject.alice.tasks.AliceTaskExecutor
@@ -642,7 +643,8 @@ class MainActivity : Activity() {
                 taskStore,
                 AliceTaskExecutor(taskStore, workspace, taskLog),
                 taskLog
-            )
+            ),
+            AliceFileRevision(this, workspace)
         ).executeUserCommand(message)
         if (toolResult.handled) {
             chatHistory.add(Pair(message, true))
