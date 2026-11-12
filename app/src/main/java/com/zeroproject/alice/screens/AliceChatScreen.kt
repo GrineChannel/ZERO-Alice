@@ -28,7 +28,8 @@ class AliceChatScreen(
     private val initialStatus: String,
     private val initialSendEnabled: Boolean,
     private val onBackClick: () -> Unit,
-    private val onSendClick: (String) -> Unit
+    private val onSendClick: (String) -> Unit,
+    private val onVoiceClick: () -> Unit = {}
 ) {
 
     private val navy = Color.rgb(11, 20, 38)
@@ -281,6 +282,20 @@ class AliceChatScreen(
                 sendCurrentMessage()
             }
         }
+
+        val voiceButton = Button(context).apply {
+            text = "🎤"
+            textSize = 20f
+            contentDescription = "Голосовой ввод"
+            isAllCaps = false
+            backgroundTintList = ColorStateList.valueOf(panel)
+            setOnClickListener { onVoiceClick() }
+        }
+
+        composer.addView(
+            voiceButton,
+            LinearLayout.LayoutParams(dp(48), dp(50))
+        )
 
         composer.addView(
             sendButton!!,
