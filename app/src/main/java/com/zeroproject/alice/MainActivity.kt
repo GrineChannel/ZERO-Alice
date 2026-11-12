@@ -710,7 +710,50 @@ class MainActivity : Activity() {
             workspace,
             AliceTaskCommands(
                 taskStore,
-                AliceTaskExecutor(taskStore, workspace, taskLog, revisions, minecraftEngineer.projectManager),
+                AliceTaskExecutor(
+                    taskStore, workspace, taskLog, revisions, minecraftEngineer.projectManager
+                ) { projectPrefix, goal, completed ->
+                    val matches = minecraftEngineer.projectManager.listProjects().filter {
+                        it.id.startsWith(projectPrefix, ignoreCase = true)
+                    }
+                    if (projectPrefix.length < 4 || matches.size != 1 ||
+                        engineerBusy || !localEngine.isReady()) {
+                        false
+                    } else {
+                        engineerBusy = true
+                        try {
+                            minecraftEngineer.develop(
+                                projectId = matches.single().id,
+                                goal = goal,
+                                onProgress = { progress ->
+                                    runOnUiThread {
+                                        if (isChatOpen) chatScreen?.updateStatus(progress)
+                                    }
+                                },
+                                onResult = { result ->
+                                    runOnUiThread {
+                                        engineerBusy = false
+                                        completed(true, "Minecraft: ${result.project.name}; проверка ${result.testReport.status}")
+                                        chatHistory.add(Pair("Minecraft-задача завершена: ${result.project.name}", false))
+                                        if (isChatOpen) chatScreen?.setMessages(chatHistory)
+                                    }
+                                },
+                                onError = { error ->
+                                    runOnUiThread {
+                                        engineerBusy = false
+                                        completed(false, "Minecraft-разработка: $error")
+                                        chatHistory.add(Pair("Ошибка Minecraft-задачи: $error", false))
+                                        if (isChatOpen) chatScreen?.setMessages(chatHistory)
+                                    }
+                                }
+                            )
+                            true
+                        } catch (error: Exception) {
+                            engineerBusy = false
+                            false
+                        }
+                    }
+                },
                 taskLog
             ),
             revisions
