@@ -86,6 +86,22 @@ class AliceMemory(context: Context) {
         )
     }
 
+    // Search the complete on-device message history without loading it all.
+    fun hasMessageContaining(term: String): Boolean {
+        val needle = term.trim()
+        if (needle.length < 4) return false
+        helper.readableDatabase.query(
+            "messages", arrayOf("content"), null, null, null, null, null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                if (cursor.getString(0).contains(needle, ignoreCase = true)) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     // Remove old messages containing an explicitly forgotten fact value.
     // The whole message is removed to avoid retaining partial private text.
     fun deleteMessagesContaining(terms: Collection<String>): Int {
