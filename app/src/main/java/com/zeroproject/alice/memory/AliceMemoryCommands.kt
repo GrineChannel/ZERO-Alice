@@ -164,7 +164,9 @@ class AliceMemoryCommands(
             return "Я не нашла в памяти информацию по запросу: $query"
         }
 
-        memory.addForgottenTerms(matches.map { it.value })
+        memory.addForgottenTerms(matches.flatMap { fact ->
+            listOf(fact.value, "key:${fact.key}")
+        })
         matches.forEach { fact ->
             memory.deleteFact(fact.id)
         }
