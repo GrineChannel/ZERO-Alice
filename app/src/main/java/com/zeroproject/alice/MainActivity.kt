@@ -642,7 +642,7 @@ class MainActivity : Activity() {
             workspace,
             AliceTaskCommands(
                 taskStore,
-                AliceTaskExecutor(taskStore, workspace, taskLog, revisions),
+                AliceTaskExecutor(taskStore, workspace, taskLog, revisions, minecraftEngineer.projectManager),
                 taskLog
             ),
             revisions
