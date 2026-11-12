@@ -109,11 +109,26 @@ class AliceMemoryManager(
         processNext()
     }
 
+    // Check exclusions immediately before writing, including results from
+    // analysis tasks queued before the user requested forgetting.
+    private fun wasForgotten(key: String, value: String): Boolean {
+        val terms = memory.getForgottenTerms()
+        return terms.any { term ->
+            if (term.startsWith("key:")) {
+                key.equals(term.removePrefix("key:"), ignoreCase = true)
+            } else {
+                value.contains(term, ignoreCase = true) ||
+                    key.contains(term, ignoreCase = true)
+            }
+        }
+    }
+
     private fun saveOrUpdateFact(fact: ExtractedMemory): Boolean {
         val key = fact.key.trim()
         val value = fact.value.trim()
 
         if (key.isBlank() || value.isBlank()) return false
+        if (wasForgotten(key, value)) return false
         if (key.length > 100 || value.length > 500) return false
 
         val existingFacts = memory.getFacts()
