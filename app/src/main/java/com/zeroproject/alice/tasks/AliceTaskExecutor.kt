@@ -10,6 +10,32 @@ class AliceTaskExecutor(
     private val store: AliceTaskStore,
     private val workspace: AliceWorkspace
 ) {
+    /**
+     * Runs at most five steps per explicit user request. A failed or unsupported
+     * step stops the batch without marking it complete. A later request resumes
+     * from the last persisted completed step.
+     */
+    fun executeBatch(taskId: String, maxSteps: Int = 5): String {
+        val limit = maxSteps.coerceIn(1, 5)
+        val messages = mutableListOf<String>()
+        for (index in 0 until limit) {
+            val before = store.list().firstOrNull { it.id == taskId }
+                ?: return "Задача не найдена."
+            if (before.status == "completed" || before.status == "cancelled") break
+            val result = executeNext(taskId)
+            messages.add(result)
+            val after = store.list().firstOrNull { it.id == taskId }
+                ?: break
+            if (after.completedSteps <= before.completedSteps) break
+            if (after.status == "completed" || after.status == "cancelled") break
+        }
+        return if (messages.isEmpty()) {
+            "Задача завершена или отменена."
+        } else {
+            messages.joinToString("\\n")
+        }
+    }
+
     fun executeNext(taskId: String): String {
         val task = store.list().firstOrNull { it.id == taskId }
             ?: return "Задача не найдена."
