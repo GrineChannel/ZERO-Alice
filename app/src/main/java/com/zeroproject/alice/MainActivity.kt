@@ -135,6 +135,13 @@ class MainActivity : Activity() {
             aliceMemory
         )
         minecraftEngineer = AliceMinecraftEngineer(this, localEngine)
+        if (minecraftEngineer.interruptedTasksOnStartup > 0) {
+            Toast.makeText(
+                this,
+                "Прерванных Minecraft-задач: ${minecraftEngineer.interruptedTasksOnStartup}. Проверь журнал разработки.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
 
         window.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
