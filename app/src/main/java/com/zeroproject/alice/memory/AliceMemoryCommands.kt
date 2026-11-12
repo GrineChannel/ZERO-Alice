@@ -170,10 +170,13 @@ class AliceMemoryCommands(
         memory.addForgottenTerms(matches.flatMap { fact ->
             listOf(fact.value, "key:${fact.key}")
         })
+        // Remove matching historical messages as well as saved facts.
+        // This is intentionally limited to the values of matched facts.
+        val deletedMessages = memory.deleteMessagesContaining(matches.map { it.value })
         matches.forEach { fact ->
             memory.deleteFact(fact.id)
         }
 
-        return "Удалила факт из памяти и исключила его значение из будущего контекста. История чата пока сохранена."
+        return "Удалила факты из памяти и $deletedMessages сообщений из истории, содержащих забытые значения. Остальная история сохранена."
     }
 }
