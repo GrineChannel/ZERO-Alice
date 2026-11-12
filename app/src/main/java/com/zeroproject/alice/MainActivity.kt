@@ -654,6 +654,25 @@ class MainActivity : Activity() {
             chatScreen?.setMessages(chatHistory)
             return
         }
+        if (lowerCommand.startsWith("проверь версию minecraft элис ")) {
+            val args = command.substring("проверь версию minecraft элис ".length).trim().split(Regex("\\s+"))
+            val prefix = args.getOrNull(0).orEmpty()
+            val batchPrefix = args.getOrNull(1).orEmpty()
+            val matches = if (prefix.length >= 4) minecraftEngineer.projectManager.listProjects().filter {
+                it.id.startsWith(prefix, ignoreCase = true)
+            } else emptyList()
+            val reply = if (matches.size != 1 || batchPrefix.length < 4 || args.size != 2) {
+                "Формат: проверь версию minecraft элис ID_проекта ID_версии"
+            } else try {
+                minecraftEngineer.projectManager.inspectPreviewBatch(matches.single().id, batchPrefix)
+            } catch (error: Exception) {
+                "Ошибка проверки версии: ${error.message}"
+            }
+            chatHistory.add(Pair(message, true))
+            chatHistory.add(Pair(reply, false))
+            chatScreen?.setMessages(chatHistory)
+            return
+        }
         if (lowerCommand.startsWith("покажи версии minecraft элис ")) {
             val prefix = command.substring("покажи версии minecraft элис ".length).trim()
             val matches = if (prefix.length >= 4) minecraftEngineer.projectManager.listProjects().filter {
