@@ -46,12 +46,28 @@ class AliceChatManager(
 
     private fun buildPreviousContext(): String {
 
-        val messages = memory.getMessages(5000)
-            .takeLast(30)
-            .filterNot {
-                isExcludedFromContext(it.content) ||
-                    (it.role == "user" && isMemoryControlMessage(it.content))
+        val forgottenValues = memory.getForgottenTerms()
+            .filterNot { it.startsWith("key:") }
+
+        // Old app versions stored memory commands and their replies as
+        // adjacent chat records. Skip both, without deleting user history.
+        var skipNextAssistant = false
+        val messages = memory.getMessages(5000).filter { message ->
+            if (message.role == "user") {
+                skipNextAssistant = isMemoryControlMessage(message.content)
+                !skipNextAssistant
+            } else if (message.role == "assistant" && skipNextAssistant) {
+                skipNextAssistant = false
+                false
+            } else {
+                skipNextAssistant = false
+                true
             }
+        }.filterNot { message ->
+            forgottenValues.any { term ->
+                message.content.contains(term, ignoreCase = true)
+            }
+        }.takeLast(30)
 
         if (messages.isEmpty()) return ""
 
