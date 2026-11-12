@@ -126,6 +126,43 @@ class AliceEngineerFileWriter(
     }
 
     /**
+     * Read-only inventory of automatic backup batches.
+     * Backups are not restored or modified by this operation.
+     */
+    @Synchronized
+    fun listBackups(projectId: String): String {
+        val project = projectManager.getProject(projectId)
+            ?: throw IllegalArgumentException("Minecraft-проект не найден")
+        val root = project.directory.canonicalFile
+        val directory = File(root, "backups/auto").canonicalFile
+        require(directory.path.startsWith(root.path + File.separator)) {
+            "Недопустимая папка резервных копий"
+        }
+        val batches = directory.listFiles()?.filter {
+            it.isDirectory && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
+                it.canonicalPath.startsWith(directory.path + File.separator)
+        }?.sortedByDescending { it.lastModified() }?.take(20).orEmpty()
+        if (batches.isEmpty()) return "Резервных копий Minecraft-проекта пока нет."
+        return buildString {
+            append("Резервные копии проекта ${project.name}:\n")
+            for (batch in batches) {
+                val rootBatch = batch.canonicalFile
+                var count = 0
+                rootBatch.walkTopDown().onEnter {
+                    (it.canonicalPath == rootBatch.path ||
+                        it.canonicalPath.startsWith(rootBatch.path + File.separator)) &&
+                        !java.nio.file.Files.isSymbolicLink(it.toPath())
+                }.filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+                    .take(31).forEach { count++ }
+                append("${batch.name.take(8)} | файлов: ${count.coerceAtMost(30)}")
+                if (count > 30) append("+")
+                append("\n")
+            }
+            append("Просмотр не изменяет файлы. В копиях хранятся ранее существовавшие файлы.")
+        }
+    }
+
+    /**
      * Apply one explicitly selected preview batch through the existing
      * backup-backed writer. The preview itself is left intact.
      */
