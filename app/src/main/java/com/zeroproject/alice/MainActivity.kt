@@ -18,6 +18,7 @@ import com.zeroproject.alice.screens.AliceChatScreen
 import com.zeroproject.alice.screens.AliceDeviceScreen
 import com.zeroproject.alice.screens.AliceEngineerScreen
 import com.zeroproject.alice.engineer.minecraft.AliceMinecraftEngineer
+import com.zeroproject.alice.engineer.AliceEngineerFileWriter
 import com.zeroproject.alice.device.AliceDeviceActions
 import com.zeroproject.alice.tools.AliceToolRegistry
 import com.zeroproject.alice.files.AliceWorkspace
@@ -649,6 +650,29 @@ class MainActivity : Activity() {
                 else failed.take(20).joinToString("\\n") {
                     "${it.id.take(8)} | ${it.goal.take(70)} | ${it.message.take(100)}"
                 }
+            chatHistory.add(Pair(message, true))
+            chatHistory.add(Pair(reply, false))
+            chatScreen?.setMessages(chatHistory)
+            return
+        }
+        if (lowerCommand.startsWith("примени версию minecraft элис ")) {
+            val args = command.substring("примени версию minecraft элис ".length).trim().split(Regex("\\s+"))
+            val prefix = args.getOrNull(0).orEmpty()
+            val batchPrefix = args.getOrNull(1).orEmpty()
+            val matches = if (prefix.length >= 4) minecraftEngineer.projectManager.listProjects().filter {
+                it.id.startsWith(prefix, ignoreCase = true)
+            } else emptyList()
+            val reply = if (matches.size != 1 || batchPrefix.length < 4 || args.size != 2) {
+                "Формат: примени версию minecraft элис ID_проекта ID_версии"
+            } else if (engineerBusy) {
+                "Дождись завершения текущей разработки."
+            } else try {
+                val result = AliceEngineerFileWriter(minecraftEngineer.projectManager)
+                    .applyPreview(matches.single().id, batchPrefix)
+                "Версия применена: файлов ${result.writtenFiles.size}, новых ${result.createdFiles.size}, резервных копий ${result.backupFiles.size}. Предварительная версия сохранена."
+            } catch (error: Exception) {
+                "Не удалось применить версию: ${error.message}"
+            }
             chatHistory.add(Pair(message, true))
             chatHistory.add(Pair(reply, false))
             chatScreen?.setMessages(chatHistory)
