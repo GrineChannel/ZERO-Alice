@@ -126,7 +126,8 @@ class AliceChatManager(
     fun sendMessage(
         text: String,
         onResponse: (String) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        onHistoryChanged: (() -> Unit)? = null
     ) {
 
         if (text.isBlank()) {
@@ -139,6 +140,9 @@ class AliceChatManager(
         val commandResponse = memoryCommands.handle(text)
 
         if (commandResponse != null) {
+
+            // Notify the UI to reload the persisted history after changes.
+            onHistoryChanged?.invoke()
 
             // Do not persist commands or their replies: doing so would
             // reintroduce forgotten values after a reset or restart.
