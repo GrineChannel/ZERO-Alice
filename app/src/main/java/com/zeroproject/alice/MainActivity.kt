@@ -603,6 +603,17 @@ class MainActivity : Activity() {
                 }
             },
 
+            onHistoryChanged = {
+                // Rebuild the visible transcript from SQLite after a forget
+                // command. This also removes messages deleted from storage.
+                chatHistory.clear()
+                chatManager.getHistory().forEach { saved ->
+                    chatHistory.add(Pair(saved.content, saved.role == "user"))
+                }
+                if (isChatOpen) {
+                    chatScreen?.setMessages(chatHistory)
+                }
+            },
             onError = { error ->
 
                 aiState.finishGeneration()
