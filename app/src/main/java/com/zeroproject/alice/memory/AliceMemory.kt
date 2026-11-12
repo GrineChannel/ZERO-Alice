@@ -193,6 +193,24 @@ class AliceMemory(context: Context) {
         }
     }
 
+    // Explicit permission to remember a fact again removes its matching blocks.
+    fun allowFactAgain(key: String, value: String) {
+        val db = helper.writableDatabase
+        val keyBlock = "key:" + key.trim().lowercase()
+        val normalizedValue = value.trim().lowercase()
+        db.beginTransaction()
+        try {
+            db.delete(
+                "forgotten_terms",
+                "term = ? OR term = ?",
+                arrayOf(keyBlock, normalizedValue)
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun clearForgottenTerms() {
         helper.writableDatabase.delete("forgotten_terms", null, null)
     }
