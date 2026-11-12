@@ -111,6 +111,43 @@ class MinecraftProjectManager(context: Context) {
         return readProjectMetadata(directory)
     }
 
+    /**
+     * Read-only inventory before retrying code generation.
+     * Never follows paths outside the project's canonical root.
+     */
+    @Synchronized
+    fun inspectProjectFiles(projectId: String): String {
+        val project = requireProject(projectId)
+        val root = project.directory.canonicalFile
+        val files = mutableListOf<String>()
+        var totalBytes = 0L
+        for (pack in listOf("behavior_pack", "resource_pack")) {
+            val directory = File(root, pack)
+            if (!directory.isDirectory) continue
+            directory.walkTopDown().onEnter { folder ->
+                val safe = folder.canonicalPath.startsWith(root.path + File.separator)
+                safe && !java.nio.file.Files.isSymbolicLink(folder.toPath())
+            }.filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+                .take(201).forEach { file ->
+                    val canonical = file.canonicalFile
+                    if (canonical.path.startsWith(root.path + File.separator)) {
+                        if (files.size < 200) {
+                            files.add("${canonical.relativeTo(root).invariantSeparatorsPath} (${canonical.length()} байт)")
+                        }
+                        totalBytes += canonical.length()
+                    }
+                }
+        }
+        return buildString {
+            append("Проект: ${project.name} (${project.id.take(8)})\\n")
+            append("Файлов (до 200): ${files.size}, размер: $totalBytes байт\\n")
+            if (files.isEmpty()) append("Файлы дополнения пока не созданы.")
+            else append(files.sorted().joinToString("\\n"))
+            if (files.size >= 200) append("\\nСписок ограничен 200 файлами.")
+            append("\\nПроверка только читает файлы и ничего не изменяет.")
+        }
+    }
+
     @Synchronized
     fun writeFile(
         projectId: String,
