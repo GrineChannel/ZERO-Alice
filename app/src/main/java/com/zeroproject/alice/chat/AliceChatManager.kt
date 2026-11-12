@@ -104,7 +104,19 @@ class AliceChatManager(
             memory.saveMessage("assistant", commandResponse)
 
             contextInjected = false
-            onResponse(commandResponse)
+
+            // Memory changes must also invalidate Gemma's in-session chat.
+            // Only report success once the old conversation has been replaced.
+            if (engine.isReady()) {
+                engine.resetChatConversation(
+                    onComplete = { onResponse(commandResponse) },
+                    onError = { error ->
+                        onError("Память обновлена, но контекст ИИ не сброшен: $error")
+                    }
+                )
+            } else {
+                onResponse(commandResponse)
+            }
             return
         }
 
