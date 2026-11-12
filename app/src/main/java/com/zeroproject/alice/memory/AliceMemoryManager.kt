@@ -31,6 +31,19 @@ class AliceMemoryManager(
         }
     }
 
+    // Serialize command execution with background fact writes. A command
+    // cannot clear memory between a generation check and a database write.
+    fun executeMemoryCommand(action: () -> String?): String? {
+        return synchronized(queueLock) {
+            val response = action()
+            if (response != null) {
+                generation++
+                queue.clear()
+            }
+            response
+        }
+    }
+
     fun analyzeDialogue(
         dialogue: String,
         onComplete: (Int) -> Unit = {},
@@ -137,14 +150,14 @@ class AliceMemoryManager(
         }
     }
 
-    private fun saveOrUpdateFact(fact: ExtractedMemory, taskGeneration: Long): Boolean {
-        if (synchronized(queueLock) { taskGeneration != generation }) return false
+    private fun saveOrUpdateFact(fact: ExtractedMemory, taskGeneration: Long): Boolean = synchronized(queueLock) {
+        if (taskGeneration != generation) return false
         val key = fact.key.trim()
         val value = fact.value.trim()
 
         if (key.isBlank() || value.isBlank()) return false
         if (wasForgotten(key, value)) return false
-        if (synchronized(queueLock) { taskGeneration != generation }) return false
+        if (taskGeneration != generation) return false
         if (key.length > 100 || value.length > 500) return false
 
         val existingFacts = memory.getFacts()
