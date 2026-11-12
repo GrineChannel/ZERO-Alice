@@ -2,6 +2,7 @@ package com.zeroproject.alice.tools
 
 import com.zeroproject.alice.device.AliceDeviceActions
 import com.zeroproject.alice.files.AliceWorkspace
+import com.zeroproject.alice.tasks.AliceTaskCommands
 
 /**
  * Only explicit user commands can invoke tools. Model output is never
@@ -9,7 +10,8 @@ import com.zeroproject.alice.files.AliceWorkspace
  */
 class AliceToolRegistry(
     private val deviceActions: AliceDeviceActions,
-    private val workspace: AliceWorkspace? = null
+    private val workspace: AliceWorkspace? = null,
+    private val taskCommands: AliceTaskCommands? = null
 ) {
     data class Tool(
         val id: String,
@@ -34,6 +36,9 @@ class AliceToolRegistry(
         )
 
     fun executeUserCommand(text: String): Result {
+        taskCommands?.handle(text)?.let {
+            return Result(true, true, it)
+        }
         val command = text.trim()
         val lower = command.lowercase()
 
