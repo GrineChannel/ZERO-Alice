@@ -641,6 +641,37 @@ class MainActivity : Activity() {
         // Explicit Minecraft engineering commands use the existing shared Gemma engine.
         val command = message.trim()
         val lowerCommand = command.lowercase()
+        if (lowerCommand == "покажи прерванные minecraft задачи элис") {
+            val failed = minecraftEngineer.taskCore.getTasks().filter {
+                it.status == com.zeroproject.alice.engineer.EngineerTaskStatus.FAILED
+            }
+            val reply = if (failed.isEmpty()) "Прерванных или неудачных Minecraft-задач нет."
+                else failed.take(20).joinToString("\\n") {
+                    "${it.id.take(8)} | ${it.goal.take(70)} | ${it.message.take(100)}"
+                }
+            chatHistory.add(Pair(message, true))
+            chatHistory.add(Pair(reply, false))
+            chatScreen?.setMessages(chatHistory)
+            return
+        }
+        if (lowerCommand.startsWith("подготовь повтор minecraft элис ")) {
+            val prefix = command.substring("подготовь повтор minecraft элис ".length).trim()
+            val matches = if (prefix.length >= 4) minecraftEngineer.taskCore.getTasks().filter {
+                it.id.startsWith(prefix, ignoreCase = true)
+            } else emptyList()
+            val reply = if (matches.size != 1) {
+                "Укажи однозначный ID задачи (минимум 4 символа)."
+            } else try {
+                val retry = minecraftEngineer.taskCore.prepareRetry(matches.single().id)
+                "Создана новая ожидающая задача ${retry.id.take(8)} для проекта ${retry.projectId.take(8)}. Файлы не изменены. Перед запуском проверь существующие файлы в разделе разработки."
+            } catch (error: Exception) {
+                "Не удалось подготовить повтор: ${error.message}"
+            }
+            chatHistory.add(Pair(message, true))
+            chatHistory.add(Pair(reply, false))
+            chatScreen?.setMessages(chatHistory)
+            return
+        }
         if (lowerCommand == "покажи minecraft проекты элис") {
             val projects = minecraftEngineer.projectManager.listProjects()
             val reply = if (projects.isEmpty()) "Minecraft-проектов пока нет."
