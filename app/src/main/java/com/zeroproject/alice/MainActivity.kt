@@ -636,15 +636,16 @@ class MainActivity : Activity() {
         val workspace = AliceWorkspace(this)
         val taskStore = AliceTaskStore(this)
         val taskLog = AliceTaskLog(this)
+        val revisions = AliceFileRevision(this, workspace)
         val toolResult = AliceToolRegistry(
             AliceDeviceActions(this),
             workspace,
             AliceTaskCommands(
                 taskStore,
-                AliceTaskExecutor(taskStore, workspace, taskLog),
+                AliceTaskExecutor(taskStore, workspace, taskLog, revisions),
                 taskLog
             ),
-            AliceFileRevision(this, workspace)
+            revisions
         ).executeUserCommand(message)
         if (toolResult.handled) {
             chatHistory.add(Pair(message, true))
