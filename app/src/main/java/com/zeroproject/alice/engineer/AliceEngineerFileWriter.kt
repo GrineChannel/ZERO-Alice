@@ -125,6 +125,52 @@ class AliceEngineerFileWriter(
         }
     }
 
+    /**
+     * Apply one explicitly selected preview batch through the existing
+     * backup-backed writer. The preview itself is left intact.
+     */
+    @Synchronized
+    fun applyPreview(projectId: String, batchPrefix: String): EngineerFileWriteResult {
+        require(batchPrefix.length >= 4 && batchPrefix.matches(Regex("[a-fA-F0-9-]+"))) {
+            "Укажи ID версии (минимум 4 символа)"
+        }
+        val project = projectManager.getProject(projectId)
+            ?: throw IllegalArgumentException("Minecraft-проект не найден")
+        val root = project.directory.canonicalFile
+        val previewRoot = File(root, "backups/previews").canonicalFile
+        require(previewRoot.path.startsWith(root.path + File.separator)) {
+            "Недопустимая папка версий"
+        }
+        val matches = previewRoot.listFiles()?.filter {
+            it.isDirectory && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
+                it.name.startsWith(batchPrefix, ignoreCase = true) &&
+                it.canonicalPath.startsWith(previewRoot.path + File.separator)
+        }.orEmpty()
+        require(matches.size == 1) { "Версия не найдена или ID неоднозначен" }
+        val batch = matches.single().canonicalFile
+        val candidates = mutableListOf<EngineerGeneratedFile>()
+        var totalSize = 0L
+        batch.walkTopDown().onEnter { directory ->
+            directory.canonicalPath.startsWith(batch.path + File.separator) ||
+                directory.canonicalPath == batch.path
+        }.filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+            .forEach { file ->
+                require(candidates.size < MAX_FILES) { "Слишком много файлов в версии" }
+                val safe = file.canonicalFile
+                require(safe.path.startsWith(batch.path + File.separator)) {
+                    "Недопустимый файл версии"
+                }
+                val path = safe.relativeTo(batch).invariantSeparatorsPath
+                require(isSafeAddonPath(path)) { "Недопустимый путь: $path" }
+                require(safe.length() <= MAX_FILE_SIZE) { "Файл слишком большой: $path" }
+                totalSize += safe.length()
+                require(totalSize <= MAX_TOTAL_SIZE) { "Версия слишком большая" }
+                candidates.add(EngineerGeneratedFile(path, safe.readText(Charsets.UTF_8)))
+            }
+        require(candidates.isNotEmpty()) { "В выбранной версии нет файлов" }
+        return writeFiles(projectId, candidates)
+    }
+
     @Synchronized
     fun writeFiles(
         projectId: String,
