@@ -170,11 +170,9 @@ class AliceMemoryCommands(
                 return "Не нашла сохранённого факта. Для удаления из истории укажи точное значение, например: Забудь Москва."
             }
 
-            val foundInHistory = memory.getMessages(5000).any { entry ->
-                entry.content.contains(query, ignoreCase = true)
-            }
+            val foundInHistory = memory.hasMessageContaining(query)
             if (!foundInHistory) {
-                return "Не нашла указанное значение в сохранённых фактах или последних 5000 сообщениях."
+                return "Не нашла указанное значение в сохранённых фактах или истории переписки."
             }
 
             memory.addForgottenTerms(listOf(query))
