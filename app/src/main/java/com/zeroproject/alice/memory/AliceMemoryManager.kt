@@ -10,6 +10,7 @@ class AliceMemoryManager(
 ) {
     private data class PendingAnalysis(
         val dialogue: String,
+        val generation: Long,
         val onComplete: (Int) -> Unit,
         val onError: (String) -> Unit
     )
@@ -19,6 +20,16 @@ class AliceMemoryManager(
     private val queueLock = Any()
 
     private var analysisRunning = false
+    private var generation = 0L
+
+    // Invalidate queued and in-flight extraction after memory commands.
+    // Results from earlier generations must never write back into memory.
+    fun invalidatePendingAnalyses() {
+        synchronized(queueLock) {
+            generation++
+            queue.clear()
+        }
+    }
 
     fun analyzeDialogue(
         dialogue: String,
@@ -32,7 +43,7 @@ class AliceMemoryManager(
 
         synchronized(queueLock) {
             queue.addLast(
-                PendingAnalysis(dialogue, onComplete, onError)
+                PendingAnalysis(dialogue, generation, onComplete, onError)
             )
         }
 
@@ -59,6 +70,9 @@ class AliceMemoryManager(
                         var savedCount = 0
 
                         for (fact in extracted) {
+                            if (synchronized(queueLock) { task.generation != generation }) {
+                                break
+                            }
                             if (
                                 containsSensitiveInformation(
                                     fact.key + " " + fact.value
@@ -67,7 +81,7 @@ class AliceMemoryManager(
                                 continue
                             }
 
-                            if (saveOrUpdateFact(fact)) {
+                            if (saveOrUpdateFact(fact, task.generation)) {
                                 savedCount++
                             }
                         }
@@ -123,12 +137,14 @@ class AliceMemoryManager(
         }
     }
 
-    private fun saveOrUpdateFact(fact: ExtractedMemory): Boolean {
+    private fun saveOrUpdateFact(fact: ExtractedMemory, taskGeneration: Long): Boolean {
+        if (synchronized(queueLock) { taskGeneration != generation }) return false
         val key = fact.key.trim()
         val value = fact.value.trim()
 
         if (key.isBlank() || value.isBlank()) return false
         if (wasForgotten(key, value)) return false
+        if (synchronized(queueLock) { taskGeneration != generation }) return false
         if (key.length > 100 || value.length > 500) return false
 
         val existingFacts = memory.getFacts()
