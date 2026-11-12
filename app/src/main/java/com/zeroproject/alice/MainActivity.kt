@@ -15,6 +15,7 @@ import java.util.Locale
 import com.zeroproject.alice.screens.AliceHomeScreen
 import com.zeroproject.alice.screens.AliceModelScreen
 import com.zeroproject.alice.screens.AliceChatScreen
+import com.zeroproject.alice.screens.AliceDeviceScreen
 import com.zeroproject.alice.screens.AliceEngineerScreen
 import com.zeroproject.alice.engineer.minecraft.AliceMinecraftEngineer
 
@@ -96,6 +97,7 @@ class MainActivity : Activity() {
     private val isModelScreenOpen get() = navigation.isModelScreenOpen
     private val isEngineerOpen get() = navigation.isEngineerOpen
     private var isDownloading = false
+    private var deviceScreenOpen = false
 
     private lateinit var aiManager: AliceAIManager
     private val aiState get() = aiManager.state
@@ -160,7 +162,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android API")
     override fun onBackPressed() {
 
-        if (navigation.canNavigateBack) {
+        if (deviceScreenOpen || navigation.canNavigateBack) {
             showHome()
             return
         }
@@ -184,6 +186,7 @@ class MainActivity : Activity() {
 
     private fun showHome() {
 
+        deviceScreenOpen = false
         navigation.navigateHome()
 
         chatScreen = null
@@ -214,10 +217,22 @@ class MainActivity : Activity() {
                     "Настройки будут добавлены следующим этапом"
                 )
             },
-            onEngineerClick = { showEngineer() }
+            onEngineerClick = { showEngineer() },
+            onDeviceClick = { showDeviceControls() }
         )
 
         setContentView(homeScreen.create())
+    }
+
+    private fun showDeviceControls() {
+        deviceScreenOpen = true
+        chatScreen = null
+        modelScreen = null
+        engineerScreen = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(true)
+        }
+        setContentView(AliceDeviceScreen(this, onBack = { showHome() }).create())
     }
 
     // ЭКРАН МОДЕЛИ ИИ
