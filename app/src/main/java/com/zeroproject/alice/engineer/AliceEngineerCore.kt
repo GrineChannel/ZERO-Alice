@@ -118,6 +118,23 @@ class AliceEngineerCore(
         return count
     }
 
+    /**
+     * Explicitly retry an interrupted/failed job as a NEW task.
+     * The old record remains available for diagnostics and no files are changed.
+     */
+    @Synchronized
+    fun prepareRetry(taskId: String): EngineerTask {
+        val previous = tasks.firstOrNull { it.id == taskId }
+            ?: throw IllegalArgumentException("Инженерная задача не найдена")
+        require(previous.status == EngineerTaskStatus.FAILED) {
+            "Повторный запуск доступен только для задач со статусом FAILED"
+        }
+        require(projectManager.getProject(previous.projectId) != null) {
+            "Minecraft-проект больше не найден"
+        }
+        return submitTask(previous.projectId, previous.goal)
+    }
+
     @Synchronized
     fun getTasks(): List<EngineerTask> {
         return tasks.sortedByDescending { it.createdAt }
