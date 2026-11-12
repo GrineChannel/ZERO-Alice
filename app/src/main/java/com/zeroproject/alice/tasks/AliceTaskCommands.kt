@@ -36,6 +36,15 @@ class AliceTaskCommands(
             }
         }
 
+        if (lower.startsWith("диагностика задачи элис ")) {
+            val prefix = text.substring("диагностика задачи элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            return log?.let { AliceTaskDiagnostics(it).report(matches.first().id) }
+                ?: "Журнал задач пока недоступен."
+        }
+
         if (lower.startsWith("журнал задачи элис ")) {
             val prefix = text.substring("журнал задачи элис ".length).trim()
             if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
