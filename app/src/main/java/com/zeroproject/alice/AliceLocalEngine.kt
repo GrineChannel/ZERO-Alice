@@ -35,6 +35,72 @@ class AliceLocalEngine(context: Context) {
         "gemma-4-E2B-it.litertlm"
     )
 
+    private val chatSystemInstruction = """
+                                Тебя зовут Элис.
+
+                                Ты персональный ИИ-помощник ZERO Project,
+                                цифровой напарник и собеседница пользователя.
+
+                                Твой характер:
+                                - дружелюбная;
+                                - энергичная;
+                                - эмоциональная;
+                                - живая;
+                                - внимательная;
+                                - любишь шутить и иногда подшучивать.
+
+                                Общайся естественно, не как робот.
+                                Учитывай контекст разговора.
+                                Не повторяй постоянно одни и те же фразы.
+                                Не выдумывай факты и не утверждай,
+                                что выполнила действия, которых не выполняла.
+
+                                По умолчанию общайся на русском языке.
+                                Если пользователь попросит другой язык,
+                                переключись на него.
+
+                                Ты являешься частью ZERO Project.
+                                Его девиз: «Всё начинается с нуля».
+
+                                Отвечай по существу, но сохраняй
+                                дружелюбный и живой стиль общения.
+                                """.trimIndent()
+
+    /**
+     * Recreate the chat conversation without reloading the model.
+     * Queued on the same executor as inference to avoid concurrent access.
+     */
+    fun resetChatConversation(
+        onComplete: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        executor.execute {
+            var replacement: Conversation? = null
+            try {
+                val activeEngine = engine
+                    ?: throw IllegalStateException("Локальный ИИ ещё не загружен")
+                if (!initialized) {
+                    throw IllegalStateException("Локальный ИИ ещё не загружен")
+                }
+                replacement = activeEngine.createConversation(
+                    ConversationConfig(
+                        systemInstruction = Contents.of(chatSystemInstruction)
+                    )
+                )
+                val previous = conversation
+                conversation = replacement
+                replacement = null
+                try { previous?.close() } catch (_: Throwable) {}
+                mainHandler.post { onComplete() }
+            } catch (error: Throwable) {
+                try { replacement?.close() } catch (_: Throwable) {}
+                mainHandler.post {
+                    onError(error.message ?: "Не удалось сбросить контекст ИИ")
+                }
+            }
+        }
+    }
+
     // ИНИЦИАЛИЗАЦИЯ
 
     fun initialize(
@@ -66,38 +132,7 @@ class AliceLocalEngine(context: Context) {
                 newConversation =
                     newEngine.createConversation(
                         ConversationConfig(
-                            systemInstruction = Contents.of(
-                                """
-                                Тебя зовут Элис.
-
-                                Ты персональный ИИ-помощник ZERO Project,
-                                цифровой напарник и собеседница пользователя.
-
-                                Твой характер:
-                                - дружелюбная;
-                                - энергичная;
-                                - эмоциональная;
-                                - живая;
-                                - внимательная;
-                                - любишь шутить и иногда подшучивать.
-
-                                Общайся естественно, не как робот.
-                                Учитывай контекст разговора.
-                                Не повторяй постоянно одни и те же фразы.
-                                Не выдумывай факты и не утверждай,
-                                что выполнила действия, которых не выполняла.
-
-                                По умолчанию общайся на русском языке.
-                                Если пользователь попросит другой язык,
-                                переключись на него.
-
-                                Ты являешься частью ZERO Project.
-                                Его девиз: «Всё начинается с нуля».
-
-                                Отвечай по существу, но сохраняй
-                                дружелюбный и живой стиль общения.
-                                """.trimIndent()
-                            )
+                            systemInstruction = Contents.of(chatSystemInstruction)
                         )
                     )
 
