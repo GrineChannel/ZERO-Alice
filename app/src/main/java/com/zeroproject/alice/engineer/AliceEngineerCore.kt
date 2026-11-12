@@ -92,6 +92,32 @@ class AliceEngineerCore(
         return task
     }
 
+    /**
+     * A process restart cannot resume in-memory model callbacks.
+     * Mark interrupted jobs explicitly; never report them as completed.
+     */
+    @Synchronized
+    fun markInterruptedTasks(): Int {
+        var count = 0
+        for (index in tasks.indices) {
+            val task = tasks[index]
+            if (task.status == EngineerTaskStatus.PLANNING ||
+                task.status == EngineerTaskStatus.GENERATING ||
+                task.status == EngineerTaskStatus.VALIDATING ||
+                task.status == EngineerTaskStatus.BUILDING ||
+                task.status == EngineerTaskStatus.TESTING) {
+                tasks[index] = task.copy(
+                    status = EngineerTaskStatus.FAILED,
+                    message = "Разработка прервана закрытием приложения. Проверь файлы перед повторным запуском.",
+                    updatedAt = System.currentTimeMillis()
+                )
+                count++
+            }
+        }
+        if (count > 0) saveTasks()
+        return count
+    }
+
     @Synchronized
     fun getTasks(): List<EngineerTask> {
         return tasks.sortedByDescending { it.createdAt }
