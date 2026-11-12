@@ -23,7 +23,12 @@ class AliceChatManager(
 
     private fun isExcludedFromContext(content: String): Boolean {
         return memory.getForgottenTerms().any { term ->
-            content.contains(term, ignoreCase = true)
+            if (term.startsWith("key:")) {
+                // Key exclusions are checked against saved fact keys separately.
+                false
+            } else {
+                content.contains(term, ignoreCase = true)
+            }
         }
     }
 
@@ -57,8 +62,12 @@ class AliceChatManager(
 
     private fun buildMemoryContext(): String {
 
-        val facts = memory.getFacts().filterNot {
-            isExcludedFromContext(it.key + " " + it.value)
+        val forgottenKeys = memory.getForgottenTerms()
+            .filter { it.startsWith("key:") }
+            .map { it.removePrefix("key:") }
+        val facts = memory.getFacts().filterNot { fact ->
+            forgottenKeys.any { it.equals(fact.key, ignoreCase = true) } ||
+                isExcludedFromContext(fact.key + " " + fact.value)
         }
 
         if (facts.isEmpty()) return ""
