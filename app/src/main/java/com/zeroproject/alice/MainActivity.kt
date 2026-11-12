@@ -7,6 +7,10 @@ import android.graphics.Color
 import android.os.Build
 import android.view.WindowManager
 import android.widget.Toast
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 
 import com.zeroproject.alice.screens.AliceHomeScreen
 import com.zeroproject.alice.screens.AliceModelScreen
@@ -22,6 +26,45 @@ import com.zeroproject.alice.ai.AliceAIManager
 import java.io.File
 
 class MainActivity : Activity() {
+
+    private val voiceRequestCode = 2301
+    private var voiceReplyPending = false
+    private var speechOutput: TextToSpeech? = null
+    private var speechReady = false
+
+    private fun startVoiceInput() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Скажи что-нибудь Элис")
+        }
+        try {
+            startActivityForResult(intent, voiceRequestCode)
+        } catch (error: Exception) {
+            showMessage("Распознавание речи недоступно на устройстве")
+        }
+    }
+
+    @Deprecated("Legacy activity result API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != voiceRequestCode || resultCode != RESULT_OK) return
+        val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()?.trim().orEmpty()
+        if (spoken.isBlank()) return
+        voiceReplyPending = true
+        showChat()
+        sendMessage(spoken)
+    }
+
+    private fun speakAnswer(answer: String) {
+        if (!speechReady) {
+            showMessage("Синтез речи пока недоступен")
+            return
+        }
+        speechOutput?.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "alice-reply")
+    }
+
 
     private lateinit var modelDownloader: AliceModelDownloader
     private lateinit var localEngine: AliceLocalEngine
@@ -51,6 +94,12 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        speechOutput = TextToSpeech(this) { status ->
+            speechReady = status == TextToSpeech.SUCCESS
+            if (speechReady) {
+                speechOutput?.language = Locale.forLanguageTag("ru-RU")
+            }
+        }
         modelDownloader = AliceModelDownloader(this)
         localEngine = AliceLocalEngine(this)
         aiManager = AliceAIManager(
@@ -75,6 +124,10 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+
+        speechOutput?.stop()
+        speechOutput?.shutdown()
+        speechOutput = null
 
         if (::modelDownloader.isInitialized) {
             modelDownloader.close()
@@ -138,9 +191,7 @@ class MainActivity : Activity() {
             },
 
             onVoiceClick = {
-                showMessage(
-                    "Голосовой модуль будет добавлен позже"
-                )
+                startVoiceInput()
             },
 
             onModelClick = {
@@ -595,6 +646,11 @@ class MainActivity : Activity() {
 
                 chatHistory.add(Pair(answer, false))
 
+                if (voiceReplyPending) {
+                    voiceReplyPending = false
+                    speakAnswer(answer)
+                }
+
                 if (isChatOpen) {
 
                     chatScreen?.setMessages(chatHistory)
@@ -616,6 +672,7 @@ class MainActivity : Activity() {
             },
             onError = { error ->
 
+                voiceReplyPending = false
                 aiState.finishGeneration()
 
                 if (chatHistory.isNotEmpty() &&
