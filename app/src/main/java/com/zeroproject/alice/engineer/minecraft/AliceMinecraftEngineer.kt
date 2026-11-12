@@ -233,6 +233,13 @@ class AliceMinecraftEngineer(
                         )
                         onProgress(preview)
 
+                        // Preserve generated candidates separately before modifying the add-on.
+                        val staged = fileWriter.stageFiles(
+                            projectId = project.id,
+                            files = files
+                        )
+                        onProgress(staged)
+
                         fileWriter.writeFiles(
                             projectId = project.id,
                             files = files
