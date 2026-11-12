@@ -78,6 +78,53 @@ class AliceEngineerFileWriter(
         }
     }
 
+    /**
+     * Save candidate output separately, without touching installed add-on files.
+     * Candidates are stored under backups/previews and can be inspected later.
+     */
+    @Synchronized
+    fun stageFiles(
+        projectId: String,
+        files: List<EngineerGeneratedFile>
+    ): String {
+        require(files.isNotEmpty() && files.size <= MAX_FILES) {
+            "Некорректное количество файлов"
+        }
+        val project = projectManager.getProject(projectId)
+            ?: throw IllegalArgumentException("Minecraft-проект не найден")
+        val root = project.directory.canonicalFile
+        val batchId = UUID.randomUUID().toString()
+        val staged = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+        var totalSize = 0
+        try {
+            for (generated in files) {
+                val path = generated.path.trim()
+                require(isSafeAddonPath(path) && seen.add(path)) {
+                    "Недопустимый или повторяющийся путь: $path"
+                }
+                require(generated.content.isNotBlank() && generated.content.length <= MAX_FILE_SIZE) {
+                    "Некорректный размер файла: $path"
+                }
+                totalSize += generated.content.length
+                require(totalSize <= MAX_TOTAL_SIZE) { "Превышен общий размер файлов" }
+                val destination = "backups/previews/$batchId/$path"
+                val target = File(root, destination).canonicalFile
+                require(target.path.startsWith(root.path + File.separator)) {
+                    "Недопустимый путь предварительной версии"
+                }
+                projectManager.writeFile(projectId, destination, generated.content)
+                staged.add(destination)
+            }
+            return "Предварительная версия $batchId: сохранено ${staged.size} файлов отдельно от дополнения."
+        } catch (error: Exception) {
+            for (path in staged.asReversed()) {
+                try { projectManager.deleteFile(projectId, path) } catch (_: Exception) { }
+            }
+            throw error
+        }
+    }
+
     @Synchronized
     fun writeFiles(
         projectId: String,
