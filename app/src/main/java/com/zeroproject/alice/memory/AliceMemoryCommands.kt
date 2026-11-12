@@ -25,7 +25,9 @@ class AliceMemoryCommands(
             lower.startsWith("очисти память")
         ) {
             memory.clearFacts()
-            return "Хорошо. Я очистила свою долговременную память. ❤️"
+            memory.clearHistory()
+            memory.clearForgottenTerms()
+            return "Очистила сохранённые факты и историю переписки. ❤️"
         }
 
         if (
@@ -162,10 +164,11 @@ class AliceMemoryCommands(
             return "Я не нашла в памяти информацию по запросу: $query"
         }
 
+        memory.addForgottenTerms(matches.map { it.value })
         matches.forEach { fact ->
             memory.deleteFact(fact.id)
         }
 
-        return "Хорошо. Я забыла эту информацию. ❤️"
+        return "Удалила факт из памяти и исключила его значение из будущего контекста. История чата пока сохранена."
     }
 }
