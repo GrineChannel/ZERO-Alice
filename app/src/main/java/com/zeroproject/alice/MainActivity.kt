@@ -52,8 +52,19 @@ class MainActivity : Activity() {
         val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             ?.firstOrNull()?.trim().orEmpty()
         if (spoken.isBlank()) return
+        if (!localEngine.isReady()) {
+            voiceReplyPending = false
+            showChat()
+            showMessage("Дождись запуска локального ИИ и повтори голосовой запрос")
+            return
+        }
+        if (aiState.isGenerating) {
+            voiceReplyPending = false
+            showMessage("Элис ещё отвечает на предыдущий запрос")
+            return
+        }
         voiceReplyPending = true
-        showChat()
+        if (!isChatOpen) showChat()
         sendMessage(spoken)
     }
 
@@ -445,6 +456,9 @@ class MainActivity : Activity() {
 
             onSendClick = { message ->
                 sendMessage(message)
+            },
+            onVoiceClick = {
+                startVoiceInput()
             }
         )
 
