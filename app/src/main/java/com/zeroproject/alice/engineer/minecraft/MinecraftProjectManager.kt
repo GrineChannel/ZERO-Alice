@@ -184,6 +184,58 @@ class MinecraftProjectManager(context: Context) {
         }
     }
 
+    /**
+     * Inspect files from one staged preview, without reading outside its directory.
+     * A short batch prefix is accepted only when it uniquely identifies a batch.
+     */
+    @Synchronized
+    fun inspectPreviewBatch(projectId: String, batchPrefix: String): String {
+        require(batchPrefix.length >= 4 && batchPrefix.matches(Regex("[a-fA-F0-9-]+"))) {
+            "Укажи ID предварительной версии (минимум 4 символа)"
+        }
+        val project = requireProject(projectId)
+        val root = project.directory.canonicalFile
+        val previews = File(root, "backups/previews").canonicalFile
+        require(previews.path.startsWith(root.path + File.separator)) {
+            "Недопустимая папка предварительных версий"
+        }
+        val matches = previews.listFiles()?.filter {
+            it.isDirectory && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
+                it.name.startsWith(batchPrefix, ignoreCase = true) &&
+                it.canonicalPath.startsWith(previews.path + File.separator)
+        }.orEmpty()
+        require(matches.size == 1) {
+            "Предварительная версия не найдена или ID неоднозначен"
+        }
+        val batch = matches.single().canonicalFile
+        val entries = mutableListOf<String>()
+        batch.walkTopDown().onEnter { folder ->
+            folder.canonicalPath.startsWith(batch.path) &&
+                !java.nio.file.Files.isSymbolicLink(folder.toPath())
+        }.filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+            .take(101).forEach { file ->
+                val safe = file.canonicalFile
+                if (safe.path.startsWith(batch.path + File.separator) && entries.size < 100) {
+                    val relative = safe.relativeTo(batch).invariantSeparatorsPath
+                    val active = File(root, relative).canonicalFile
+                    val status = when {
+                        !active.path.startsWith(root.path + File.separator) -> "НЕБЕЗОПАСНО"
+                        !active.isFile -> "НОВЫЙ"
+                        active.length() != safe.length() -> "ИЗМЕНЁН"
+                        active.readBytes().contentEquals(safe.readBytes()) -> "БЕЗ ИЗМЕНЕНИЙ"
+                        else -> "ИЗМЕНЁН"
+                    }
+                    entries.add("$status | $relative (${safe.length()} байт)")
+                }
+            }
+        return buildString {
+            append("Версия ${batch.name.take(8)} проекта ${project.name}:\n")
+            append(if (entries.isEmpty()) "Файлы не найдены." else entries.sorted().joinToString("\n"))
+            if (entries.size >= 100) append("\nСписок ограничен 100 файлами.")
+            append("\nПроверка не изменяет файлы.")
+        }
+    }
+
     @Synchronized
     fun writeFile(
         projectId: String,
