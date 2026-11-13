@@ -10,7 +10,6 @@ import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceTextFactory
-import com.zeroproject.alice.ui.AliceChoiceRow
 
 class AliceVoiceSettingsScreen(private val context: Context, private val onBack: () -> Unit = {}) {
     private val preferences = AliceVoicePreferences(context)

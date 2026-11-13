@@ -12,7 +12,6 @@ import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceToggleRow
-import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceTextFactory
 
 class AliceSettingsScreen(private val context: Context, private val onAppearanceChanged: () -> Unit = {}, private val onBack: () -> Unit = {}) {
