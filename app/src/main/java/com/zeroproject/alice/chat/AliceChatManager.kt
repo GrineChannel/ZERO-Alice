@@ -1,13 +1,13 @@
 
 package com.zeroproject.alice.chat
 
-import com.zeroproject.alice.AliceLocalEngine
+import com.zeroproject.alice.ai.runtime.AliceConversationEngine
 import com.zeroproject.alice.memory.AliceMemory
 import com.zeroproject.alice.memory.AliceMemoryCommands
 import com.zeroproject.alice.memory.AliceMemoryManager
 
 class AliceChatManager(
-    private val engine: AliceLocalEngine,
+    private val engine: AliceConversationEngine,
     private val memory: AliceMemory
 ) {
 
@@ -156,7 +156,7 @@ class AliceChatManager(
             // Memory changes must also invalidate Gemma's in-session chat.
             // Only report success once the old conversation has been replaced.
             if (engine.isReady()) {
-                engine.resetChatConversation(
+                engine.resetConversation(
                     onComplete = { onResponse(commandResponse) },
                     onError = { error ->
                         onError("Память обновлена, но контекст ИИ не сброшен: $error")
@@ -198,10 +198,10 @@ class AliceChatManager(
 
         memory.saveMessage("user", text)
 
-        engine.sendMessage(
-            text = prompt,
+        engine.generate(
+            prompt = prompt,
 
-            onResponse = { response ->
+            onResult = { response ->
 
                 memory.saveMessage("assistant", response)
 

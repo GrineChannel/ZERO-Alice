@@ -181,7 +181,7 @@ class MainActivity : Activity() {
 
         aliceMemory = AliceMemory(this)
         chatManager = AliceChatManager(
-            localEngine,
+            AliceGemmaEngineAdapter(localEngine),
             aliceMemory
         )
         minecraftEngineer = AliceMinecraftEngineer(this, localEngine)

@@ -1,12 +1,12 @@
 
 package com.zeroproject.alice.memory
 
-import com.zeroproject.alice.AliceLocalEngine
+import com.zeroproject.alice.ai.runtime.AliceConversationEngine
 import java.util.ArrayDeque
 
 class AliceMemoryManager(
     private val memory: AliceMemory,
-    private val engine: AliceLocalEngine
+    private val engine: AliceConversationEngine
 ) {
     private data class PendingAnalysis(
         val dialogue: String,
