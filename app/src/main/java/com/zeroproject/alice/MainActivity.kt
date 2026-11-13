@@ -252,7 +252,7 @@ class MainActivity : Activity() {
 
     private fun showSettings() {
         navigation.navigateTo(AliceNavigation.Screen.SETTINGS)
-        setContentView(AliceSettingsScreen(this).createView())
+        setContentView(AliceSettingsScreen(this, onAppearanceChanged = { showSettings() }).createView())
     }
 
     private fun showAvatar() {

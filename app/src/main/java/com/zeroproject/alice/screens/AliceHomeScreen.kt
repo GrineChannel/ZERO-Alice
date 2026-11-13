@@ -90,7 +90,12 @@ class AliceHomeScreen(
         addSpace(root, 35)
 
         // Temporary vector preview; approved artwork will replace it later.
-        root.addView(AliceAvatarPreviewFactory.create(context, 200))
+        root.addView(AliceAvatarPreviewFactory.create(context, 200).apply {
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Открыть настройки образа Элис"
+            setOnClickListener { onAvatarClick() }
+        })
 
         addSpace(root, 24)
 

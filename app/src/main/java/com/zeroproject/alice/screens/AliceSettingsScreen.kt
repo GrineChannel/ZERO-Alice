@@ -13,7 +13,7 @@ import com.zeroproject.alice.ui.AliceToggleRow
 import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceTextFactory
 
-class AliceSettingsScreen(private val context: Context) {
+class AliceSettingsScreen(private val context: Context, private val onAppearanceChanged: () -> Unit = {}) {
     private val store = AliceSettingsStore(context)
 
     fun createView(): View {
@@ -38,7 +38,7 @@ class AliceSettingsScreen(private val context: Context) {
             store.save(store.load().copy(appearance = next))
             themeLabel.text = "Тема: ${next.name}"
             Toast.makeText(context, "Открой экран повторно, чтобы увидеть новую тему", Toast.LENGTH_SHORT).show()
-            Toast.makeText(context, "Выбор темы сохранён", Toast.LENGTH_SHORT).show()
+            onAppearanceChanged()
         })
         val accentLabel = AliceTextFactory.subtitle(context, "Акцент: ${settings.accent.name}")
         content.addView(accentLabel)
@@ -50,6 +50,7 @@ class AliceSettingsScreen(private val context: Context) {
             }
             store.save(store.load().copy(accent = next))
             accentLabel.text = "Акцент: ${next.name}"
+            onAppearanceChanged()
         })
         content.addView(AliceTextFactory.subtitle(context,
             "Выбранное оформление сохранено. Применение темы ко всем экранам будет добавлено следующим этапом."))
