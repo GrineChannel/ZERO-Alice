@@ -14,7 +14,7 @@ import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceTextFactory
 import com.zeroproject.alice.ui.AliceToggleRow
 
-class AliceAvatarScreen(private val context: Context, private val onBack: () -> Unit = {}) {
+class AliceAvatarScreen(private val context: Context, private val onBack: () -> Unit = {}, private val onSelectArtwork: () -> Unit = {}, private val onClearArtwork: () -> Unit = {}) {
     private val store = AliceAvatarStore(context)
 
     fun createView(): View {
@@ -35,8 +35,10 @@ class AliceAvatarScreen(private val context: Context, private val onBack: () -> 
             description.text = AliceAvatarDescription.describe(AliceAvatarStyle.CANONICAL)
             Toast.makeText(context, "Канонический образ выбран", Toast.LENGTH_SHORT).show()
         })
+        content.addView(AliceChoiceRow.create(context, "ВЫБРАТЬ ИЗОБРАЖЕНИЕ ИЗ ГАЛЕРЕИ") { onSelectArtwork() })
+        content.addView(AliceChoiceRow.create(context, "УДАЛИТЬ ВЫБРАННОЕ ИЗОБРАЖЕНИЕ") { onClearArtwork() })
         content.addView(AliceTextFactory.subtitle(context,
-            "Другие образы и отображение иллюстрации появятся позже."))
+            "Выбранное изображение хранится только на устройстве и отображается на главном экране."))
         return scroll
     }
 }

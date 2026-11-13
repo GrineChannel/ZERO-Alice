@@ -8,6 +8,7 @@ import android.os.Build
 import android.view.WindowManager
 import android.widget.Toast
 import android.content.Intent
+import com.zeroproject.alice.avatar.AliceAvatarArtworkStore
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import java.util.Locale
@@ -67,9 +68,35 @@ class MainActivity : Activity() {
         }
     }
 
+    private val avatarArtworkRequestCode = 7193
+
+    private fun chooseAvatarArtwork() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+        }
+        try {
+            startActivityForResult(intent, avatarArtworkRequestCode)
+        } catch (error: Exception) {
+            showMessage("Не удалось открыть выбор изображения")
+        }
+    }
+
     @Deprecated("Legacy activity result API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == avatarArtworkRequestCode) {
+            if (resultCode == RESULT_OK && data?.data != null) {
+                try {
+                    AliceAvatarArtworkStore(this).importFrom(data.data!!)
+                    showAvatar()
+                    showMessage("Изображение Элис сохранено")
+                } catch (error: Exception) {
+                    showMessage("Не удалось сохранить изображение: " + (error.message ?: "ошибка"))
+                }
+            }
+            return
+        }
         if (requestCode != voiceRequestCode || resultCode != RESULT_OK) return
         val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             ?.firstOrNull()?.trim().orEmpty()
@@ -263,7 +290,10 @@ class MainActivity : Activity() {
     private fun showAvatar() {
         deviceScreenOpen = false
         navigation.navigateTo(AliceNavigation.Screen.AVATAR)
-        setContentView(AliceAvatarScreen(this, onBack = { showHome() }).createView())
+        setContentView(AliceAvatarScreen(this, onBack = { showHome() }, onSelectArtwork = { chooseAvatarArtwork() }, onClearArtwork = {
+            AliceAvatarArtworkStore(this).clear()
+            showAvatar()
+        }).createView())
     }
 
     private fun showVoiceSettings() {
