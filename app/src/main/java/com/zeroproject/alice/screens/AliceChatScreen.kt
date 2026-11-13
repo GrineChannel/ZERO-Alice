@@ -45,6 +45,7 @@ class AliceChatScreen(
 
     private var statusView: TextView? = null
     private var sendButton: Button? = null
+    private var canSendMessage = false
 
     private fun dp(value: Int): Int {
         return (value * context.resources.displayMetrics.density).toInt()
@@ -317,8 +318,10 @@ class AliceChatScreen(
 
         val message = messageInput.text.toString().trim()
 
-        if (message.isEmpty()) return
+        if (message.isEmpty() || !canSendMessage) return
 
+        // Lock synchronously: keyboard action and button cannot submit twice.
+        setSendEnabled(false)
         messageInput.setText("")
 
         onSendClick(message)
@@ -399,6 +402,7 @@ class AliceChatScreen(
 
     fun setSendEnabled(enabled: Boolean) {
 
+        canSendMessage = enabled
         sendButton?.isEnabled = enabled
 
         sendButton?.alpha = if (enabled) {
