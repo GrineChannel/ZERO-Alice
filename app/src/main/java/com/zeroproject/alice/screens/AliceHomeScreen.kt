@@ -21,7 +21,10 @@ class AliceHomeScreen(
     private val onModelClick: () -> Unit,
     private val onSettingsClick: () -> Unit,
     private val onEngineerClick: () -> Unit = {},
-    private val onDeviceClick: () -> Unit = {}
+    private val onDeviceClick: () -> Unit = {},
+    private val onAvatarClick: () -> Unit = {},
+    private val onVoiceSettingsClick: () -> Unit = {},
+    private val onCapabilitiesClick: () -> Unit = {}
 ) {
 
     private val navy = Color.rgb(11, 20, 38)
@@ -126,6 +129,15 @@ class AliceHomeScreen(
         addSpace(root, 14)
 
         root.addView(makeButton("НАСТРОЙКИ", onSettingsClick))
+
+        addSpace(root, 14)
+        root.addView(makeButton("ОБРАЗ ЭЛИС", onAvatarClick))
+
+        addSpace(root, 14)
+        root.addView(makeButton("НАСТРОЙКИ ГОЛОСА", onVoiceSettingsClick))
+
+        addSpace(root, 14)
+        root.addView(makeButton("ВОЗМОЖНОСТИ ЭЛИС", onCapabilitiesClick))
 
         addSpace(root, 35)
 

@@ -12,6 +12,10 @@ import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import java.util.Locale
 
+import com.zeroproject.alice.screens.AliceSettingsScreen
+import com.zeroproject.alice.screens.AliceAvatarScreen
+import com.zeroproject.alice.screens.AliceVoiceSettingsScreen
+import com.zeroproject.alice.screens.AliceCapabilitiesScreen
 import com.zeroproject.alice.screens.AliceHomeScreen
 import com.zeroproject.alice.screens.AliceModelScreen
 import com.zeroproject.alice.screens.AliceChatScreen
@@ -228,16 +232,35 @@ class MainActivity : Activity() {
                 showModelScreen()
             },
 
-            onSettingsClick = {
-                showMessage(
-                    "Настройки будут добавлены следующим этапом"
-                )
-            },
+            onSettingsClick = { showSettings() },
+            onAvatarClick = { showAvatar() },
+            onVoiceSettingsClick = { showVoiceSettings() },
+            onCapabilitiesClick = { showCapabilities() },
             onEngineerClick = { showEngineer() },
             onDeviceClick = { showDeviceControls() }
         )
 
         setContentView(homeScreen.create())
+    }
+
+    private fun showSettings() {
+        navigation.navigateTo(AliceNavigation.Screen.SETTINGS)
+        setContentView(AliceSettingsScreen(this).createView())
+    }
+
+    private fun showAvatar() {
+        navigation.navigateTo(AliceNavigation.Screen.AVATAR)
+        setContentView(AliceAvatarScreen(this).createView())
+    }
+
+    private fun showVoiceSettings() {
+        navigation.navigateTo(AliceNavigation.Screen.VOICE_SETTINGS)
+        setContentView(AliceVoiceSettingsScreen(this).createView())
+    }
+
+    private fun showCapabilities() {
+        navigation.navigateTo(AliceNavigation.Screen.CAPABILITIES)
+        setContentView(AliceCapabilitiesScreen(this).createView())
     }
 
     private fun showDeviceControls() {

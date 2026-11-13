@@ -12,7 +12,11 @@ class AliceNavigation {
         HOME,
         CHAT,
         MODEL,
-        ENGINEER
+        ENGINEER,
+        SETTINGS,
+        AVATAR,
+        VOICE_SETTINGS,
+        CAPABILITIES
     }
 
     var currentScreen: Screen = Screen.HOME
