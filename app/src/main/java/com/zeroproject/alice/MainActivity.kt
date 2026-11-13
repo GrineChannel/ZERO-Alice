@@ -291,8 +291,18 @@ class MainActivity : Activity() {
         deviceScreenOpen = false
         navigation.navigateTo(AliceNavigation.Screen.AVATAR)
         setContentView(AliceAvatarScreen(this, onBack = { showHome() }, onSelectArtwork = { chooseAvatarArtwork() }, onClearArtwork = {
-            AliceAvatarArtworkStore(this).clear()
-            showAvatar()
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Удалить изображение Элис?")
+                .setMessage("Изображение будет удалено только из приложения. Оригинал в галерее останется.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Удалить") { _, _ ->
+                    if (AliceAvatarArtworkStore(this).clear()) {
+                        showAvatar()
+                    } else {
+                        showMessage("Не удалось удалить изображение")
+                    }
+                }
+                .show()
         }).createView())
     }
 
