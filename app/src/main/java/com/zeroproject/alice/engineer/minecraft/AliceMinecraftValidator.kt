@@ -323,7 +323,7 @@ class AliceMinecraftValidator {
     }
 
     private fun isSafeScriptEntry(entry: String): Boolean {
-        return !entry.startsWith("/") && !entry.contains('\\\\') &&
+        return !entry.startsWith("/") && !entry.contains('\\') &&
             !entry.contains(':') &&
             entry.split('/').all { it.isNotBlank() && it != "." && it != ".." }
     }
