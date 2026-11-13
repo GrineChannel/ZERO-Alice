@@ -2,6 +2,9 @@
 package com.zeroproject.alice.screens
 
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -46,6 +49,7 @@ class AliceChatScreen(
     private var statusView: TextView? = null
     private var sendButton: Button? = null
     private var canSendMessage = false
+    private var displayedMessages: List<Pair<String, Boolean>> = emptyList()
 
     private fun dp(value: Int): Int {
         return (value * context.resources.displayMetrics.density).toInt()
@@ -158,6 +162,15 @@ class AliceChatScreen(
                 1f
             )
         )
+
+        val copyButton = Button(context).apply {
+            text = "⧉"
+            contentDescription = "Копировать переписку"
+            setTextColor(silver)
+            backgroundTintList = ColorStateList.valueOf(panel)
+            setOnClickListener { copyConversation() }
+        }
+        header.addView(copyButton, LinearLayout.LayoutParams(dp(52), dp(52)))
 
         root.addView(
             header,
@@ -385,6 +398,7 @@ class AliceChatScreen(
 
     fun setMessages(messages: List<Pair<String, Boolean>>) {
 
+        displayedMessages = messages.toList()
         messagesLayout.removeAllViews()
 
         for (message in messages) {
@@ -392,6 +406,19 @@ class AliceChatScreen(
         }
 
         scrollToBottom()
+    }
+
+    private fun copyConversation() {
+        if (displayedMessages.isEmpty()) {
+            Toast.makeText(context, "Переписка пуста", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val transcript = displayedMessages.joinToString("\n\n") { (message, isUser) ->
+            (if (isUser) "Пользователь" else "Элис") + ": " + message
+        }
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Переписка ZERO Alice", transcript))
+        Toast.makeText(context, "Переписка скопирована", Toast.LENGTH_SHORT).show()
     }
 
     // СОСТОЯНИЕ ИИ
