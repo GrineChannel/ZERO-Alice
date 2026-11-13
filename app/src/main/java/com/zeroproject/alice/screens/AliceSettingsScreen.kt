@@ -37,6 +37,7 @@ class AliceSettingsScreen(private val context: Context) {
             }
             store.save(store.load().copy(appearance = next))
             themeLabel.text = "Тема: ${next.name}"
+            Toast.makeText(context, "Открой экран повторно, чтобы увидеть новую тему", Toast.LENGTH_SHORT).show()
             Toast.makeText(context, "Выбор темы сохранён", Toast.LENGTH_SHORT).show()
         })
         val accentLabel = AliceTextFactory.subtitle(context, "Акцент: ${settings.accent.name}")
