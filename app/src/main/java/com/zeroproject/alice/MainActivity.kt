@@ -655,6 +655,29 @@ class MainActivity : Activity() {
             chatScreen?.setMessages(chatHistory)
             return
         }
+        if (lowerCommand.startsWith("восстанови копию minecraft элис ")) {
+            val args = command.substring("восстанови копию minecraft элис ".length).trim().split(Regex("\\s+"))
+            val prefix = args.getOrNull(0).orEmpty()
+            val backupPrefix = args.getOrNull(1).orEmpty()
+            val matches = if (prefix.length >= 4) minecraftEngineer.projectManager.listProjects().filter {
+                it.id.startsWith(prefix, ignoreCase = true)
+            } else emptyList()
+            val reply = if (matches.size != 1 || backupPrefix.length < 4 || args.size != 2) {
+                "Формат: восстанови копию minecraft элис ID_проекта ID_копии"
+            } else if (engineerBusy) {
+                "Дождись завершения текущей разработки."
+            } else try {
+                val result = AliceEngineerFileWriter(minecraftEngineer.projectManager)
+                    .restoreBackup(matches.single().id, backupPrefix)
+                "Восстановлено файлов: ${result.writtenFiles.size}. Текущие версии сохранены в новых резервных копиях (${result.backupFiles.size}). Новые файлы предыдущей разработки не удалялись."
+            } catch (error: Exception) {
+                "Не удалось восстановить копию: ${error.message}"
+            }
+            chatHistory.add(Pair(message, true))
+            chatHistory.add(Pair(reply, false))
+            chatScreen?.setMessages(chatHistory)
+            return
+        }
         if (lowerCommand.startsWith("покажи копии minecraft элис ")) {
             val prefix = command.substring("покажи копии minecraft элис ".length).trim()
             val matches = if (prefix.length >= 4) minecraftEngineer.projectManager.listProjects().filter {
