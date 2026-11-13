@@ -56,6 +56,7 @@ class MainActivity : Activity() {
             showMessage("Голосовой ввод отключён в настройках")
             return
         }
+        speechOutput?.stop()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
@@ -122,6 +123,7 @@ class MainActivity : Activity() {
             showMessage("Синтез речи пока недоступен")
             return
         }
+        speechOutput?.setSpeechRate(AliceVoicePreferences(this).speechRate())
         val prepared = AliceSpeechTextPolicy.prepare(answer)
         if (prepared.isNotBlank()) {
             speechOutput?.speak(prepared, TextToSpeech.QUEUE_FLUSH, null, "alice-reply")

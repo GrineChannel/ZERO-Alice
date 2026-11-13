@@ -31,6 +31,25 @@ class AliceVoiceSettingsScreen(private val context: Context, private val onBack:
             modeLabel.text = "Режим: " + AliceVoiceModeLabels.label(preferences.mode())
             Toast.makeText(context, "Режим сохранён", Toast.LENGTH_SHORT).show()
         })
+        val rateLabel = AliceTextFactory.subtitle(context,
+            "Скорость речи: " + when (preferences.speechRate()) {
+                0.85f -> "медленная"
+                1.15f -> "быстрая"
+                else -> "обычная"
+            })
+        content.addView(rateLabel)
+        content.addView(AliceChoiceRow.create(context, "МЕДЛЕННАЯ РЕЧЬ") {
+            preferences.setSpeechRate(0.85f)
+            rateLabel.text = "Скорость речи: медленная"
+        })
+        content.addView(AliceChoiceRow.create(context, "ОБЫЧНАЯ РЕЧЬ") {
+            preferences.setSpeechRate(1.0f)
+            rateLabel.text = "Скорость речи: обычная"
+        })
+        content.addView(AliceChoiceRow.create(context, "БЫСТРАЯ РЕЧЬ") {
+            preferences.setSpeechRate(1.15f)
+            rateLabel.text = "Скорость речи: быстрая"
+        })
         content.addView(AliceTextFactory.subtitle(context,
             "Режим без рук пока не реализован. Настройка будет подключена к голосовой кнопке отдельно."))
         return scroll
