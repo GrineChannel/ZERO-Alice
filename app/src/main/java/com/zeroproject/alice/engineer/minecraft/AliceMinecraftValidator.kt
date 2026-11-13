@@ -452,9 +452,23 @@ class AliceMinecraftValidator {
 
         if (!directory.isDirectory) return
 
-        val files = directory.walkTopDown()
-            .filter { it.isFile && it.extension == "js" }
-            .toList()
+        val root = directory.canonicalFile
+        val files = directory.walkTopDown().onEnter { folder ->
+            (folder.canonicalPath == root.path ||
+                folder.canonicalPath.startsWith(root.path + File.separator)) &&
+                !java.nio.file.Files.isSymbolicLink(folder.toPath())
+        }.filter {
+            it.isFile && it.extension.equals("js", ignoreCase = true) &&
+                !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
+                it.canonicalPath.startsWith(root.path + File.separator)
+        }.take(201).toList()
+        if (files.size > 200) {
+            issues.add(ValidationIssue(
+                ValidationSeverity.WARNING,
+                relativePath,
+                "Проверка JavaScript ограничена первыми 200 файлами"
+            ))
+        }
 
         for (file in files) {
 
@@ -479,6 +493,25 @@ class AliceMinecraftValidator {
                         "JavaScript-файл пустой"
                     )
                 )
+            }
+
+            if (content.contains("import ") &&
+                content.contains("from \"@minecraft/server\"") &&
+                !File(directory, "manifest.json").isFile
+            ) {
+                issues.add(ValidationIssue(
+                    ValidationSeverity.WARNING,
+                    file.relativeTo(directory).invariantSeparatorsPath,
+                    "Используется Script API, но manifest.json отсутствует"
+                ))
+            }
+
+            if (content.contains("require(\"@minecraft/server\")")) {
+                issues.add(ValidationIssue(
+                    ValidationSeverity.WARNING,
+                    file.relativeTo(directory).invariantSeparatorsPath,
+                    "Для Bedrock Script API обычно нужен ES module import вместо require()"
+                ))
             }
 
             if (content.contains("eval(")) {
