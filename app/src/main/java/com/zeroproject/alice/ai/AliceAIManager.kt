@@ -1,6 +1,6 @@
 package com.zeroproject.alice.ai
 
-import com.zeroproject.alice.AliceLocalEngine
+import com.zeroproject.alice.ai.runtime.AliceEngineContract
 import com.zeroproject.alice.AliceModelDownloader
 import java.io.File
 
@@ -11,7 +11,7 @@ import java.io.File
 class AliceAIManager(
     private val modelFile: File,
     private val downloader: AliceModelDownloader,
-    private val engine: AliceLocalEngine,
+    private val engine: AliceEngineContract,
     val state: AliceAIState = AliceAIState()
 ) {
     enum class StartResult {

@@ -9,6 +9,9 @@ import android.view.WindowManager
 import android.widget.Toast
 import android.content.Intent
 import com.zeroproject.alice.avatar.AliceAvatarArtworkStore
+import com.zeroproject.alice.ai.runtime.AliceGemmaEngineAdapter
+import com.zeroproject.alice.ai.runtime.AliceEngineRegistry
+import com.zeroproject.alice.ai.runtime.AliceEngineCatalog
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import java.util.Locale
@@ -152,6 +155,7 @@ class MainActivity : Activity() {
     private var isDownloading = false
     private var deviceScreenOpen = false
 
+    private val engineRegistry = AliceEngineRegistry()
     private lateinit var aiManager: AliceAIManager
     private val aiState get() = aiManager.state
 
@@ -168,10 +172,11 @@ class MainActivity : Activity() {
         }
         modelDownloader = AliceModelDownloader(this)
         localEngine = AliceLocalEngine(this)
+        engineRegistry.register(AliceGemmaEngineAdapter(localEngine))
         aiManager = AliceAIManager(
             File(filesDir, "gemma-4-E2B-it.litertlm"),
             modelDownloader,
-            localEngine
+            requireNotNull(engineRegistry.resolve(AliceEngineCatalog.GEMMA))
         )
 
         aliceMemory = AliceMemory(this)
