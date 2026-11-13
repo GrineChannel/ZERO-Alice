@@ -377,26 +377,62 @@ class AliceMinecraftValidator {
             }
 
             val uuid = dependency.optString("uuid")
+            val moduleName = dependency.optString("module_name")
+            val hasUuid = uuid.isNotBlank()
+            val hasModuleName = moduleName.isNotBlank()
 
-            if (!isValidUuid(uuid)) {
+            if (hasUuid == hasModuleName) {
                 issues.add(
                     ValidationIssue(
                         ValidationSeverity.ERROR,
                         path,
-                        "Некорректный UUID зависимости $i"
+                        "Зависимость $i должна содержать либо uuid, либо module_name"
                     )
                 )
-            } else if (!seen.add(uuid)) {
+                continue
+            }
+
+            val key = if (hasUuid) {
+                if (!isValidUuid(uuid)) {
+                    issues.add(
+                        ValidationIssue(
+                            ValidationSeverity.ERROR,
+                            path,
+                            "Некорректный UUID зависимости $i"
+                        )
+                    )
+                }
+                "uuid:$uuid"
+            } else {
+                if (!moduleName.startsWith("@minecraft/")) {
+                    issues.add(
+                        ValidationIssue(
+                            ValidationSeverity.WARNING,
+                            path,
+                            "Неизвестное имя API-модуля: $moduleName"
+                        )
+                    )
+                }
+                "module:$moduleName"
+            }
+
+            if (!seen.add(key)) {
                 issues.add(
                     ValidationIssue(
                         ValidationSeverity.ERROR,
                         path,
-                        "Повторяющаяся зависимость: $uuid"
+                        "Повторяющаяся зависимость: $key"
                     )
                 )
             }
 
-            if (!isValidVersion(dependency.optJSONArray("version"))) {
+            val validVersion = if (hasUuid) {
+                isValidVersion(dependency.optJSONArray("version"))
+            } else {
+                val version = dependency.optString("version")
+                version.matches(Regex("\\d+\\.\\d+\\.\\d+(?:-(?:beta|alpha|rc)(?:\\.\\d+)?)?"))
+            }
+            if (!validVersion) {
                 issues.add(
                     ValidationIssue(
                         ValidationSeverity.ERROR,
