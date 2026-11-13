@@ -13,6 +13,10 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.zeroproject.alice.settings.AliceSettingsStore
+import com.zeroproject.alice.settings.AliceThemeResolver
+import com.zeroproject.alice.settings.AliceThemePaletteFactory
+import com.zeroproject.alice.avatar.AliceAvatarPreviewFactory
 
 class AliceHomeScreen(
     private val context: Context,
@@ -27,11 +31,16 @@ class AliceHomeScreen(
     private val onCapabilitiesClick: () -> Unit = {}
 ) {
 
-    private val navy = Color.rgb(11, 20, 38)
-    private val panel = Color.rgb(27, 42, 66)
-    private val red = Color.rgb(217, 54, 79)
-    private val silver = Color.rgb(198, 205, 216)
-    private val muted = Color.rgb(145, 158, 180)
+    private val appearance = AliceSettingsStore(context).load()
+    private val theme = AliceThemePaletteFactory.create(
+        AliceThemeResolver.isDark(appearance.appearance, context.resources.configuration),
+        appearance.accent
+    )
+    private val navy = theme.background
+    private val panel = theme.surface
+    private val red = theme.accent
+    private val silver = theme.text
+    private val muted = theme.text
 
     private fun dp(value: Int): Int {
         return (value * context.resources.displayMetrics.density).toInt()
@@ -80,20 +89,8 @@ class AliceHomeScreen(
 
         addSpace(root, 35)
 
-        val avatar = TextView(context).apply {
-            text = "A"
-            textSize = 90f
-            includeFontPadding = true
-            gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(red)
-            background = rounded(panel, red, 2, 28)
-        }
-
-        root.addView(
-            avatar,
-            LinearLayout.LayoutParams(dp(200), dp(200))
-        )
+        // Temporary vector preview; approved artwork will replace it later.
+        root.addView(AliceAvatarPreviewFactory.create(context, 200))
 
         addSpace(root, 24)
 
