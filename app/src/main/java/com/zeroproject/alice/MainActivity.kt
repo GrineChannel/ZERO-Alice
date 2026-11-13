@@ -36,6 +36,9 @@ import com.zeroproject.alice.memory.AliceMemory
 import com.zeroproject.alice.chat.AliceChatManager
 import com.zeroproject.alice.navigation.AliceNavigation
 import com.zeroproject.alice.ai.AliceAIManager
+import com.zeroproject.alice.voice.AliceVoiceMode
+import com.zeroproject.alice.voice.AliceVoicePreferences
+import com.zeroproject.alice.settings.AliceSettingsStore
 
 import java.io.File
 
@@ -47,6 +50,10 @@ class MainActivity : Activity() {
     private var speechReady = false
 
     private fun startVoiceInput() {
+        if (AliceVoicePreferences(this).mode() == AliceVoiceMode.OFF) {
+            showMessage("Голосовой ввод отключён в настройках")
+            return
+        }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
@@ -1014,10 +1021,9 @@ class MainActivity : Activity() {
 
                 chatHistory.add(Pair(answer, false))
 
-                if (voiceReplyPending) {
-                    voiceReplyPending = false
-                    speakAnswer(answer)
-                }
+                val shouldSpeak = voiceReplyPending || AliceSettingsStore(this).load().voiceReplies
+                voiceReplyPending = false
+                if (shouldSpeak) speakAnswer(answer)
 
                 if (isChatOpen) {
 
