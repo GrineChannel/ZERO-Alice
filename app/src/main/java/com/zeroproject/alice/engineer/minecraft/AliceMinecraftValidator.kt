@@ -91,6 +91,8 @@ class AliceMinecraftValidator {
             )
         }
 
+        validatePackReferences(behaviorPack, resourcePack, issues)
+
         val hasErrors = issues.any {
             it.severity == ValidationSeverity.ERROR
         }
@@ -99,6 +101,60 @@ class AliceMinecraftValidator {
             valid = !hasErrors,
             issues = issues
         )
+    }
+
+    /**
+     * Check local pack-to-pack UUID dependencies when both manifests exist.
+     * External Script API module_name dependencies are handled separately.
+     */
+    private fun validatePackReferences(
+        behaviorPack: File,
+        resourcePack: File,
+        issues: MutableList<ValidationIssue>
+    ) {
+        val behaviorManifest = File(behaviorPack, "manifest.json")
+        val resourceManifest = File(resourcePack, "manifest.json")
+        if (!behaviorManifest.isFile || !resourceManifest.isFile) return
+        val behavior = try { JSONObject(behaviorManifest.readText(Charsets.UTF_8)) }
+            catch (_: Exception) { return }
+        val resource = try { JSONObject(resourceManifest.readText(Charsets.UTF_8)) }
+            catch (_: Exception) { return }
+        val behaviorUuid = behavior.optJSONObject("header")?.optString("uuid").orEmpty()
+        val resourceUuid = resource.optJSONObject("header")?.optString("uuid").orEmpty()
+        if (!isValidUuid(behaviorUuid) || !isValidUuid(resourceUuid)) return
+        if (behaviorUuid.equals(resourceUuid, ignoreCase = true)) {
+            issues.add(ValidationIssue(
+                ValidationSeverity.ERROR,
+                "behavior_pack/manifest.json",
+                "Behavior Pack и Resource Pack используют одинаковый header.uuid"
+            ))
+        }
+        for ((json, path, counterpart) in listOf(
+            Triple(behavior, "behavior_pack/manifest.json", resourceUuid),
+            Triple(resource, "resource_pack/manifest.json", behaviorUuid)
+        )) {
+            val dependencies = json.optJSONArray("dependencies") ?: continue
+            for (i in 0 until dependencies.length()) {
+                val dependency = dependencies.optJSONObject(i) ?: continue
+                if (dependency.optString("uuid").equals(counterpart, ignoreCase = true)) {
+                    val version = dependency.optJSONArray("version")
+                    val expected = if (path.startsWith("behavior_pack")) {
+                        resource.optJSONObject("header")?.optJSONArray("version")
+                    } else {
+                        behavior.optJSONObject("header")?.optJSONArray("version")
+                    }
+                    if (isValidVersion(version) && isValidVersion(expected) &&
+                        version.toString() != expected.toString()
+                    ) {
+                        issues.add(ValidationIssue(
+                            ValidationSeverity.WARNING,
+                            path,
+                            "Версия зависимости локального пакета не совпадает с header.version"
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     private fun validatePack(
