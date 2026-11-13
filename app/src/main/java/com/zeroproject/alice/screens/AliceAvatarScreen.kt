@@ -36,7 +36,9 @@ class AliceAvatarScreen(private val context: Context, private val onBack: () -> 
             Toast.makeText(context, "Канонический образ выбран", Toast.LENGTH_SHORT).show()
         })
         content.addView(AliceChoiceRow.create(context, "ВЫБРАТЬ ИЗОБРАЖЕНИЕ ИЗ ГАЛЕРЕИ") { onSelectArtwork() })
-        content.addView(AliceChoiceRow.create(context, "УДАЛИТЬ ВЫБРАННОЕ ИЗОБРАЖЕНИЕ") { onClearArtwork() })
+        if (com.zeroproject.alice.avatar.AliceAvatarArtworkStore(context).existingFile() != null) {
+            content.addView(AliceChoiceRow.create(context, "УДАЛИТЬ ВЫБРАННОЕ ИЗОБРАЖЕНИЕ") { onClearArtwork() })
+        }
         content.addView(AliceTextFactory.subtitle(context,
             "Выбранное изображение хранится только на устройстве и отображается на главном экране."))
         return scroll

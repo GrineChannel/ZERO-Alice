@@ -27,8 +27,10 @@ class AliceAvatarArtworkStore(private val context: Context) {
                     }
                 }
             }
-            require(android.graphics.BitmapFactory.decodeFile(temporary.absolutePath) != null) {
-                "Selected file is not a supported image"
+            val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeFile(temporary.absolutePath, options)
+            require(options.outWidth in 1..8192 && options.outHeight in 1..8192) {
+                "Unsupported image or image dimensions exceed 8192 pixels"
             }
             require(temporary.renameTo(artworkFile)) { "Cannot save image" }
         } finally {
