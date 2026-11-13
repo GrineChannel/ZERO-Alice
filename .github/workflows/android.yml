@@ -6,6 +6,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: alice-android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -48,11 +52,18 @@ jobs:
           ALICE_KEY_PASSWORD: ${{ secrets.ALICE_KEY_PASSWORD }}
         with:
           gradle-version: 8.9
-          arguments: --stacktrace assembleDebug
+          arguments: --stacktrace assembleDebug assembleRelease
 
-      - name: Upload APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: ZERO-Alice-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZERO-Alice-release
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
