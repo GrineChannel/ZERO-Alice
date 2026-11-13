@@ -655,6 +655,23 @@ class MainActivity : Activity() {
             chatScreen?.setMessages(chatHistory)
             return
         }
+        if (lowerCommand.startsWith("диагностика minecraft элис ")) {
+            val prefix = command.substring("диагностика minecraft элис ".length).trim()
+            val matches = if (prefix.length >= 4) minecraftEngineer.projectManager.listProjects().filter {
+                it.id.startsWith(prefix, ignoreCase = true)
+            } else emptyList()
+            val reply = if (matches.size != 1) {
+                "Укажи однозначный ID Minecraft-проекта (минимум 4 символа)."
+            } else try {
+                minecraftEngineer.projectManager.diagnoseProject(matches.single().id)
+            } catch (error: Exception) {
+                "Ошибка диагностики Minecraft: ${error.message}"
+            }
+            chatHistory.add(Pair(message, true))
+            chatHistory.add(Pair(reply, false))
+            chatScreen?.setMessages(chatHistory)
+            return
+        }
         if (lowerCommand.startsWith("восстанови копию minecraft элис ")) {
             val args = command.substring("восстанови копию minecraft элис ".length).trim().split(Regex("\\s+"))
             val prefix = args.getOrNull(0).orEmpty()
