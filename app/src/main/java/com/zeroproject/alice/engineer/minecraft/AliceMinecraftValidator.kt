@@ -178,6 +178,24 @@ class AliceMinecraftValidator {
             return
         }
 
+        val formatVersion = json.optInt("format_version", -1)
+        if (formatVersion < 2) {
+            issues.add(ValidationIssue(
+                ValidationSeverity.ERROR,
+                path,
+                "manifest.json: format_version должен быть не меньше 2"
+            ))
+        }
+
+        val minEngine = header.optJSONArray("min_engine_version")
+        if (minEngine == null || !isValidVersion(minEngine)) {
+            issues.add(ValidationIssue(
+                ValidationSeverity.WARNING,
+                path,
+                "Рекомендуется указать корректный header.min_engine_version"
+            ))
+        }
+
         val headerUuid = header.optString("uuid")
 
         if (!isValidUuid(headerUuid)) {
