@@ -5,6 +5,8 @@ import android.view.View
 import android.widget.Toast
 import com.zeroproject.alice.avatar.AliceAvatarDescription
 import com.zeroproject.alice.avatar.AliceAvatarStore
+import com.zeroproject.alice.avatar.AliceAvatarPreviewFactory
+import com.zeroproject.alice.avatar.AliceAvatarAccessibility
 import com.zeroproject.alice.avatar.AliceAvatarStyle
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
@@ -19,6 +21,9 @@ class AliceAvatarScreen(private val context: Context) {
         val (scroll, content) = AliceScreenContainer.create(context)
         AliceSectionHeader.add(content, "Образ Элис", "Настройки внешности")
         val current = store.load()
+        content.addView(AliceAvatarPreviewFactory.create(context).apply {
+            contentDescription = AliceAvatarAccessibility.description(current)
+        })
         val description = AliceTextFactory.subtitle(context, AliceAvatarDescription.describe(current.style))
         content.addView(description)
         content.addView(AliceToggleRow.create(context, "Анимации", current.animationsEnabled) {
