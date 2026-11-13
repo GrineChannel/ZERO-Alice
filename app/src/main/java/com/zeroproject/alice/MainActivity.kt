@@ -174,7 +174,7 @@ class MainActivity : Activity() {
         localEngine = AliceLocalEngine(this)
         engineRegistry.register(AliceGemmaEngineAdapter(localEngine))
         aiManager = AliceAIManager(
-            File(filesDir, "gemma-4-E2B-it.litertlm"),
+            modelDownloader.getModelFile(),
             modelDownloader,
             requireNotNull(engineRegistry.resolve(AliceEngineCatalog.GEMMA))
         )
@@ -348,10 +348,7 @@ class MainActivity : Activity() {
             window.setDecorFitsSystemWindows(true)
         }
 
-        val modelFile = File(
-            filesDir,
-            "gemma-4-E2B-it.litertlm"
-        )
+        val modelFile = modelDownloader.getModelFile()
 
         val modelExists = modelDownloader.isModelDownloaded()
 

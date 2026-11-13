@@ -125,6 +125,14 @@ class AliceModelDownloader(context: Context) {
 
             when (conn.responseCode) {
                 HttpURLConnection.HTTP_PARTIAL -> {
+                    // A resumed response must begin exactly at our saved byte offset.
+                    val range = conn.getHeaderField("Content-Range")
+                        ?: throw Exception("Сервер не указал Content-Range")
+                    val start = range.substringAfter("bytes ", "")
+                        .substringBefore("-").toLongOrNull()
+                    if (existingBytes <= 0L || start != existingBytes) {
+                        throw Exception("Сервер вернул неверный диапазон загрузки")
+                    }
                     append = true
 
                     totalBytes =
