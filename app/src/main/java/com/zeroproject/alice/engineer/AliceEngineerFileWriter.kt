@@ -163,6 +163,56 @@ class AliceEngineerFileWriter(
     }
 
     /**
+     * Restore only files that exist in a selected automatic backup.
+     * The current contents are backed up again by writeFiles.
+     * Newly created files from the original operation are not deleted.
+     */
+    @Synchronized
+    fun restoreBackup(projectId: String, backupPrefix: String): EngineerFileWriteResult {
+        require(backupPrefix.length >= 4 && backupPrefix.matches(Regex("[a-fA-F0-9-]+"))) {
+            "Укажи ID резервной копии (минимум 4 символа)"
+        }
+        val project = projectManager.getProject(projectId)
+            ?: throw IllegalArgumentException("Minecraft-проект не найден")
+        val root = project.directory.canonicalFile
+        val backups = File(root, "backups/auto").canonicalFile
+        require(backups.path.startsWith(root.path + File.separator)) {
+            "Недопустимая папка резервных копий"
+        }
+        val matches = backups.listFiles()?.filter {
+            it.isDirectory && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
+                it.name.startsWith(backupPrefix, ignoreCase = true) &&
+                it.canonicalPath.startsWith(backups.path + File.separator)
+        }.orEmpty()
+        require(matches.size == 1) { "Копия не найдена или ID неоднозначен" }
+        val batch = matches.single().canonicalFile
+        val candidates = mutableListOf<EngineerGeneratedFile>()
+        var totalSize = 0L
+        batch.walkTopDown().onEnter { directory ->
+            (directory.canonicalPath == batch.path ||
+                directory.canonicalPath.startsWith(batch.path + File.separator)) &&
+                !java.nio.file.Files.isSymbolicLink(directory.toPath())
+        }.filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+            .forEach { file ->
+                require(candidates.size < MAX_FILES) { "Слишком много файлов в копии" }
+                val safe = file.canonicalFile
+                require(safe.path.startsWith(batch.path + File.separator)) {
+                    "Недопустимый файл резервной копии"
+                }
+                val path = safe.relativeTo(batch).invariantSeparatorsPath
+                require(isSafeAddonPath(path)) { "Недопустимый путь: $path" }
+                require(safe.length() <= MAX_FILE_SIZE) { "Слишком большой файл: $path" }
+                totalSize += safe.length()
+                require(totalSize <= MAX_TOTAL_SIZE) { "Копия слишком большая" }
+                val content = safe.readText(Charsets.UTF_8)
+                require(content.isNotBlank()) { "Пустой файл резервной копии: $path" }
+                candidates.add(EngineerGeneratedFile(path, content))
+            }
+        require(candidates.isNotEmpty()) { "В выбранной копии нет файлов для восстановления" }
+        return writeFiles(projectId, candidates)
+    }
+
+    /**
      * Apply one explicitly selected preview batch through the existing
      * backup-backed writer. The preview itself is left intact.
      */
