@@ -38,6 +38,7 @@ import com.zeroproject.alice.navigation.AliceNavigation
 import com.zeroproject.alice.ai.AliceAIManager
 import com.zeroproject.alice.voice.AliceVoiceMode
 import com.zeroproject.alice.voice.AliceVoicePreferences
+import com.zeroproject.alice.voice.AliceSpeechTextPolicy
 import com.zeroproject.alice.settings.AliceSettingsStore
 
 import java.io.File
@@ -94,7 +95,10 @@ class MainActivity : Activity() {
             showMessage("Синтез речи пока недоступен")
             return
         }
-        speechOutput?.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "alice-reply")
+        val prepared = AliceSpeechTextPolicy.prepare(answer)
+        if (prepared.isNotBlank()) {
+            speechOutput?.speak(prepared, TextToSpeech.QUEUE_FLUSH, null, "alice-reply")
+        }
     }
 
 

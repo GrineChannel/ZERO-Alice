@@ -40,7 +40,8 @@ class AliceHomeScreen(
     private val panel = theme.surface
     private val red = theme.accent
     private val silver = theme.text
-    private val muted = theme.text
+    private val muted = if (AliceThemeResolver.isDark(appearance.appearance, context.resources.configuration))
+        Color.rgb(158, 172, 195) else Color.rgb(77, 92, 112)
 
     private fun dp(value: Int): Int {
         return (value * context.resources.displayMetrics.density).toInt()
