@@ -142,7 +142,8 @@ class AliceMinecraftValidator {
             validateManifest(
                 json,
                 "$relativePath/manifest.json",
-                issues
+                issues,
+                directory
             )
 
         } catch (error: Throwable) {
@@ -160,7 +161,8 @@ class AliceMinecraftValidator {
     private fun validateManifest(
         json: JSONObject,
         path: String,
-        issues: MutableList<ValidationIssue>
+        issues: MutableList<ValidationIssue>,
+        packRoot: File
     ) {
 
         val header = json.optJSONObject("header")
@@ -286,6 +288,20 @@ class AliceMinecraftValidator {
 
             if (type == "script") {
                 validateScriptModule(module, path, issues)
+                val entry = module.optString("entry")
+                if (entry.isNotBlank() && isSafeScriptEntry(entry) && packRoot.isDirectory) {
+                    val entryFile = File(packRoot, entry).canonicalFile
+                    val canonicalPack = packRoot.canonicalFile
+                    if (!entryFile.path.startsWith(canonicalPack.path + File.separator) ||
+                        !entryFile.isFile
+                    ) {
+                        issues.add(ValidationIssue(
+                            ValidationSeverity.ERROR,
+                            path,
+                            "Script Module entry не найден: $entry"
+                        ))
+                    }
+                }
             }
         }
 
@@ -304,6 +320,12 @@ class AliceMinecraftValidator {
             path,
             issues
         )
+    }
+
+    private fun isSafeScriptEntry(entry: String): Boolean {
+        return !entry.startsWith("/") && !entry.contains('\\\\') &&
+            !entry.contains(':') &&
+            entry.split('/').all { it.isNotBlank() && it != "." && it != ".." }
     }
 
     private fun validateScriptModule(
