@@ -2,13 +2,15 @@ package com.zeroproject.alice.screens
 import android.content.Context
 import android.view.View
 import com.zeroproject.alice.app.AliceCapabilityCatalog
+import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceTextFactory
 import com.zeroproject.alice.ui.AliceStatusLabels
-class AliceCapabilitiesScreen(private val context: Context) {
+class AliceCapabilitiesScreen(private val context: Context, private val onBack: () -> Unit = {}) {
     fun createView(): View {
         val (scroll, content) = AliceScreenContainer.create(context)
+        content.addView(AliceChoiceRow.create(context, "← НАЗАД") { onBack() })
         AliceSectionHeader.add(content, "Возможности Элис", "Базовый план модулей")
         AliceCapabilityCatalog.baseline().forEach { capability ->
             content.addView(AliceTextFactory.subtitle(context,

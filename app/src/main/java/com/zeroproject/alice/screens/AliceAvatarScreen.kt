@@ -8,17 +8,19 @@ import com.zeroproject.alice.avatar.AliceAvatarStore
 import com.zeroproject.alice.avatar.AliceAvatarPreviewFactory
 import com.zeroproject.alice.avatar.AliceAvatarAccessibility
 import com.zeroproject.alice.avatar.AliceAvatarStyle
+import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceTextFactory
 import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceToggleRow
 
-class AliceAvatarScreen(private val context: Context) {
+class AliceAvatarScreen(private val context: Context, private val onBack: () -> Unit = {}) {
     private val store = AliceAvatarStore(context)
 
     fun createView(): View {
         val (scroll, content) = AliceScreenContainer.create(context)
+        content.addView(AliceChoiceRow.create(context, "← НАЗАД") { onBack() })
         AliceSectionHeader.add(content, "Образ Элис", "Настройки внешности")
         val current = store.load()
         content.addView(AliceAvatarPreviewFactory.create(context).apply {

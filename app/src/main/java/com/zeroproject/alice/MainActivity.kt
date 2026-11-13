@@ -257,25 +257,25 @@ class MainActivity : Activity() {
     private fun showSettings() {
         deviceScreenOpen = false
         navigation.navigateTo(AliceNavigation.Screen.SETTINGS)
-        setContentView(AliceSettingsScreen(this, onAppearanceChanged = { showSettings() }).createView())
+        setContentView(AliceSettingsScreen(this, onAppearanceChanged = { showSettings() }, onBack = { showHome() }).createView())
     }
 
     private fun showAvatar() {
         deviceScreenOpen = false
         navigation.navigateTo(AliceNavigation.Screen.AVATAR)
-        setContentView(AliceAvatarScreen(this).createView())
+        setContentView(AliceAvatarScreen(this, onBack = { showHome() }).createView())
     }
 
     private fun showVoiceSettings() {
         deviceScreenOpen = false
         navigation.navigateTo(AliceNavigation.Screen.VOICE_SETTINGS)
-        setContentView(AliceVoiceSettingsScreen(this).createView())
+        setContentView(AliceVoiceSettingsScreen(this, onBack = { showHome() }).createView())
     }
 
     private fun showCapabilities() {
         deviceScreenOpen = false
         navigation.navigateTo(AliceNavigation.Screen.CAPABILITIES)
-        setContentView(AliceCapabilitiesScreen(this).createView())
+        setContentView(AliceCapabilitiesScreen(this, onBack = { showHome() }).createView())
     }
 
     private fun showDeviceControls() {

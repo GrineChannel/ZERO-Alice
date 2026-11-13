@@ -6,16 +6,18 @@ import android.widget.Toast
 import com.zeroproject.alice.voice.AliceVoicePreferences
 import com.zeroproject.alice.voice.AliceVoiceMode
 import com.zeroproject.alice.voice.AliceVoiceModeLabels
+import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceTextFactory
 import com.zeroproject.alice.ui.AliceChoiceRow
 
-class AliceVoiceSettingsScreen(private val context: Context) {
+class AliceVoiceSettingsScreen(private val context: Context, private val onBack: () -> Unit = {}) {
     private val preferences = AliceVoicePreferences(context)
 
     fun createView(): View {
         val (scroll, content) = AliceScreenContainer.create(context)
+        content.addView(AliceChoiceRow.create(context, "← НАЗАД") { onBack() })
         AliceSectionHeader.add(content, "Голос Элис", "Настройки речевого взаимодействия")
         val modeLabel = AliceTextFactory.subtitle(context,
             "Режим: " + AliceVoiceModeLabels.label(preferences.mode()))

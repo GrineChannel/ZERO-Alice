@@ -8,17 +8,19 @@ import com.zeroproject.alice.app.AliceAppVersion
 import com.zeroproject.alice.settings.AliceSettingsStore
 import com.zeroproject.alice.settings.AliceAppearance
 import com.zeroproject.alice.settings.AliceAccent
+import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceToggleRow
 import com.zeroproject.alice.ui.AliceChoiceRow
 import com.zeroproject.alice.ui.AliceTextFactory
 
-class AliceSettingsScreen(private val context: Context, private val onAppearanceChanged: () -> Unit = {}) {
+class AliceSettingsScreen(private val context: Context, private val onAppearanceChanged: () -> Unit = {}, private val onBack: () -> Unit = {}) {
     private val store = AliceSettingsStore(context)
 
     fun createView(): View {
         val (scroll, content) = AliceScreenContainer.create(context)
+        content.addView(AliceChoiceRow.create(context, "← НАЗАД") { onBack() })
         AliceSectionHeader.add(content, "Настройки Элис", "Локальные параметры приложения")
         val settings = store.load()
         content.addView(AliceToggleRow.create(context, "Анимация аватара", settings.animatedAvatar) {
