@@ -236,6 +236,32 @@ class MinecraftProjectManager(context: Context) {
         }
     }
 
+    /**
+     * Read-only static validation report for an existing Minecraft project.
+     */
+    @Synchronized
+    fun diagnoseProject(projectId: String): String {
+        val project = requireProject(projectId)
+        val report = AliceMinecraftValidator().validateProject(project)
+        val errors = report.issues.count { it.severity == ValidationSeverity.ERROR }
+        val warnings = report.issues.count { it.severity == ValidationSeverity.WARNING }
+        val infos = report.issues.count { it.severity == ValidationSeverity.INFO }
+        return buildString {
+            append("Диагностика Minecraft: ${project.name}\n")
+            append("Статус: ${if (report.valid) "без критических ошибок" else "обнаружены ошибки"}\n")
+            append("Ошибок: $errors, предупреждений: $warnings, сведений: $infos\n")
+            if (report.issues.isEmpty()) {
+                append("Статические проверки замечаний не обнаружили.")
+            } else {
+                for (issue in report.issues.take(30)) {
+                    append("${issue.severity} | ${issue.file}: ${issue.message}\n")
+                }
+                if (report.issues.size > 30) append("Показаны первые 30 замечаний.\n")
+            }
+            append("\nЭто статическая проверка, а не запуск Minecraft.")
+        }
+    }
+
     @Synchronized
     fun writeFile(
         projectId: String,
