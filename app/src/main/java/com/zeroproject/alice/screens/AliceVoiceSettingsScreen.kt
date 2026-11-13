@@ -1,19 +1,37 @@
 package com.zeroproject.alice.screens
+
 import android.content.Context
 import android.view.View
+import android.widget.Toast
 import com.zeroproject.alice.voice.AliceVoicePreferences
+import com.zeroproject.alice.voice.AliceVoiceMode
 import com.zeroproject.alice.voice.AliceVoiceModeLabels
 import com.zeroproject.alice.ui.AliceScreenContainer
 import com.zeroproject.alice.ui.AliceSectionHeader
 import com.zeroproject.alice.ui.AliceTextFactory
+import com.zeroproject.alice.ui.AliceChoiceRow
+
 class AliceVoiceSettingsScreen(private val context: Context) {
+    private val preferences = AliceVoicePreferences(context)
+
     fun createView(): View {
         val (scroll, content) = AliceScreenContainer.create(context)
         AliceSectionHeader.add(content, "Голос Элис", "Настройки речевого взаимодействия")
+        val modeLabel = AliceTextFactory.subtitle(context,
+            "Режим: " + AliceVoiceModeLabels.label(preferences.mode()))
+        content.addView(modeLabel)
+        content.addView(AliceChoiceRow.create(context, "ВКЛЮЧИТЬ НАЖАТИЕ ДЛЯ РАЗГОВОРА") {
+            preferences.setMode(AliceVoiceMode.PUSH_TO_TALK)
+            modeLabel.text = "Режим: " + AliceVoiceModeLabels.label(preferences.mode())
+            Toast.makeText(context, "Режим сохранён", Toast.LENGTH_SHORT).show()
+        })
+        content.addView(AliceChoiceRow.create(context, "ВЫКЛЮЧИТЬ ГОЛОСОВОЙ ВВОД") {
+            preferences.setMode(AliceVoiceMode.OFF)
+            modeLabel.text = "Режим: " + AliceVoiceModeLabels.label(preferences.mode())
+            Toast.makeText(context, "Режим сохранён", Toast.LENGTH_SHORT).show()
+        })
         content.addView(AliceTextFactory.subtitle(context,
-            "Режим: " + AliceVoiceModeLabels.label(AliceVoicePreferences(context).mode())))
-        content.addView(AliceTextFactory.subtitle(context,
-            "Фоновое прослушивание не включено."))
+            "Режим без рук пока не реализован. Настройка будет подключена к голосовой кнопке отдельно."))
         return scroll
     }
 }
