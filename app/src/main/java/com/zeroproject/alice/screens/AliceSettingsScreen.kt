@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.Toast
+import com.zeroproject.alice.app.AliceAppVersion
 import com.zeroproject.alice.settings.AliceSettingsStore
 import com.zeroproject.alice.settings.AliceAppearance
 import com.zeroproject.alice.settings.AliceAccent
@@ -54,6 +55,7 @@ class AliceSettingsScreen(private val context: Context, private val onAppearance
         })
         content.addView(AliceTextFactory.subtitle(context,
             "Выбранное оформление сохранено. Применение темы ко всем экранам будет добавлено следующим этапом."))
+        content.addView(AliceTextFactory.subtitle(context, "Версия приложения: " + AliceAppVersion.label(context)))
         return scroll
     }
 }
