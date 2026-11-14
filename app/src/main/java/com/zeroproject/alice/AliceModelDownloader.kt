@@ -11,6 +11,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AliceModelDownloader(context: Context) {
 
@@ -43,6 +44,8 @@ class AliceModelDownloader(context: Context) {
     private val partialFile =
         File(appContext.filesDir, "$MODEL_NAME.part")
 
+    private val downloadRunning = AtomicBoolean(false)
+
     @Volatile
     private var cancelled = false
 
@@ -61,10 +64,22 @@ class AliceModelDownloader(context: Context) {
             return
         }
 
+        if (!downloadRunning.compareAndSet(false, true)) {
+            listenerError(listener, "Загрузка модели уже выполняется")
+            return
+        }
         cancelled = false
-
-        executor.execute {
-            download(listener)
+        try {
+            executor.execute {
+                try {
+                    download(listener)
+                } finally {
+                    downloadRunning.set(false)
+                }
+            }
+        } catch (error: RuntimeException) {
+            downloadRunning.set(false)
+            listenerError(listener, error.message ?: "Не удалось начать загрузку")
         }
     }
 
@@ -232,8 +247,12 @@ class AliceModelDownloader(context: Context) {
                 )
             }
 
-            if (modelFile.exists()) {
-                modelFile.delete()
+            if (cancelled) {
+                listenerCancelled(listener)
+                return
+            }
+            if (modelFile.exists() && !modelFile.delete()) {
+                throw Exception("Не удалось заменить старую модель")
             }
 
             if (!partialFile.renameTo(modelFile)) {
