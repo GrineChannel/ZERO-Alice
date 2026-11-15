@@ -100,7 +100,8 @@ class AliceModelDownloader(context: Context) {
                     listenerComplete(listener, modelFile)
                     return
                 }
-                modelFile.delete()
+                // Keep the existing file until a new download passes SHA-256.
+                // Replacement happens only after verification below.
             }
 
             val existingBytes =
