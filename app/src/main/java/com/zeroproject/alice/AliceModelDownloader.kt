@@ -252,12 +252,27 @@ class AliceModelDownloader(context: Context) {
                 listenerCancelled(listener)
                 return
             }
-            if (modelFile.exists() && !modelFile.delete()) {
-                throw Exception("Не удалось заменить старую модель")
+            // Preserve the old file until the verified replacement is installed.
+            val backupFile = File(appContext.filesDir, "$MODEL_NAME.backup")
+            val hadOldModel = modelFile.exists()
+            if (hadOldModel) {
+                if (backupFile.exists() && !backupFile.delete()) {
+                    throw Exception("Не удалось очистить резервную копию модели")
+                }
+                if (!modelFile.renameTo(backupFile)) {
+                    throw Exception("Не удалось сохранить резервную копию модели")
+                }
             }
 
             if (!partialFile.renameTo(modelFile)) {
+                if (hadOldModel && !backupFile.renameTo(modelFile)) {
+                    throw Exception("Не удалось сохранить модель и восстановить резервную копию")
+                }
                 throw Exception("Не удалось сохранить модель")
+            }
+
+            if (hadOldModel) {
+                backupFile.delete()
             }
 
             listenerComplete(listener, modelFile)
