@@ -72,7 +72,9 @@ class AliceTaskExecutor(
             val goal = args.substring(separator + 4).trim()
             if (goal.isBlank()) return "Цель разработки не указана."
             val launcher = launchMinecraft ?: return "Запуск Minecraft-разработки недоступен."
-            val reserved = synchronized(runningLock) { runningMinecraftTasks.add(task.id) }
+            val reserved = synchronized(runningLock) {
+                if (runningLocalTasks.contains(task.id)) false else runningMinecraftTasks.add(task.id)
+            }
             if (!reserved) return "Minecraft-разработка по этой задаче уже выполняется."
             return try {
                 val accepted = launcher(projectId, goal) { success, details ->
@@ -104,7 +106,9 @@ class AliceTaskExecutor(
                 message
             }
         }
-        val reserved = synchronized(runningLock) { runningLocalTasks.add(task.id) }
+        val reserved = synchronized(runningLock) {
+            if (runningMinecraftTasks.contains(task.id)) false else runningLocalTasks.add(task.id)
+        }
         if (!reserved) return "Этот шаг задачи уже выполняется."
         return try {
             val result = when {
