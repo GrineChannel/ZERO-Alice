@@ -95,6 +95,7 @@ class AliceModelDownloader(context: Context) {
 
     private fun download(listener: Listener) {
         try {
+            recoverInterruptedReplacement()
             if (isModelDownloaded()) {
                 if (verifyModel(modelFile)) {
                     listenerComplete(listener, modelFile)
@@ -289,6 +290,34 @@ class AliceModelDownloader(context: Context) {
         } finally {
             connection?.disconnect()
             connection = null
+        }
+    }
+
+    /**
+     * Recover a verified model left in the backup slot if the process died
+     * between moving the old model aside and installing its replacement.
+     * Never overwrite a valid installed model with a backup.
+     */
+    private fun recoverInterruptedReplacement() {
+        val backup = File(appContext.filesDir, "$MODEL_NAME.backup")
+        if (!backup.isFile) return
+
+        if (modelFile.isFile && verifyModel(modelFile)) {
+            // Installed model is already valid; the backup is obsolete.
+            backup.delete()
+            return
+        }
+
+        if (!verifyModel(backup)) {
+            // An unverified backup must never become the active model.
+            return
+        }
+
+        if (modelFile.exists() && !modelFile.delete()) {
+            throw Exception("Не удалось удалить повреждённую модель перед восстановлением")
+        }
+        if (!backup.renameTo(modelFile)) {
+            throw Exception("Не удалось восстановить модель из резервной копии")
         }
     }
 
