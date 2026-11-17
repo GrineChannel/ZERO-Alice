@@ -4,6 +4,8 @@ name: ZERO Alice Android Build
 on:
   push:
     branches: [main, develop/alice-0.3.0]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
