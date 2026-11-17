@@ -14,6 +14,19 @@ class AliceTaskCommands(
         val text = input.trim()
         val lower = text.lowercase()
 
+        if (lower == "статистика задач элис") {
+            val tasks = store.list()
+            val completed = tasks.count { it.status == "completed" }
+            val cancelled = tasks.count { it.status == "cancelled" }
+            val inProgress = tasks.count { it.status == "in_progress" }
+            val planned = tasks.count { it.status == "planned" }
+            val finishedSteps = tasks.sumOf { it.completedSteps }
+            val totalSteps = tasks.sumOf { it.steps.size }
+            return "Всего задач: ${tasks.size}. Запланировано: $planned. " +
+                "В работе: $inProgress. Завершено: $completed. Отменено: $cancelled. " +
+                "Выполнено шагов: $finishedSteps/$totalSteps."
+        }
+
         if (lower == "покажи задачи элис" || lower == "список задач элис") {
             val tasks = store.list()
             if (tasks.isEmpty()) return "Задач пока нет."
