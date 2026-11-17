@@ -41,6 +41,20 @@ class AliceTaskCommands(
                 steps.joinToString("\n")
         }
 
+        if (lower.startsWith("повтори задачу элис ")) {
+            val prefix = text.substring("повтори задачу элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            return try {
+                val copy = store.duplicate(matches.first().id)
+                    ?: return "Исходная задача не найдена."
+                "Создана копия плана: ${copy.id.take(8)}. Шагов: ${copy.steps.size}. Выполнение не запущено."
+            } catch (error: Exception) {
+                "Не удалось скопировать задачу: ${error.message}"
+            }
+        }
+
         if (lower.startsWith("создай minecraft задачу элис ")) {
             val specification = text.substring("создай minecraft задачу элис ".length)
             val separator = specification.indexOf(" :: ")
