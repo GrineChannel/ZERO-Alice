@@ -12,7 +12,10 @@ import java.util.UUID
  */
 class AliceTaskStore(context: Context) {
     private val file = File(context.filesDir, "alice_tasks.json")
-    private val lock = Any()
+    companion object {
+        // Task stores created by separate chat commands share one file lock.
+        private val lock = Any()
+    }
 
     data class Task(
         val id: String,
