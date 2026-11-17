@@ -14,11 +14,57 @@ class AliceTaskCommands(
         val text = input.trim()
         val lower = text.lowercase()
 
+        if (lower == "статистика задач элис") {
+            val tasks = store.list()
+            val completed = tasks.count { it.status == "completed" }
+            val cancelled = tasks.count { it.status == "cancelled" }
+            val inProgress = tasks.count { it.status == "in_progress" }
+            val planned = tasks.count { it.status == "planned" }
+            val finishedSteps = tasks.sumOf { it.completedSteps }
+            val totalSteps = tasks.sumOf { it.steps.size }
+            return "Всего задач: ${tasks.size}. Запланировано: $planned. " +
+                "В работе: $inProgress. Завершено: $completed. Отменено: $cancelled. " +
+                "Выполнено шагов: $finishedSteps/$totalSteps."
+        }
+
         if (lower == "покажи задачи элис" || lower == "список задач элис") {
             val tasks = store.list()
             if (tasks.isEmpty()) return "Задач пока нет."
             return tasks.takeLast(20).joinToString("\n") {
                 "${it.id.take(8)} | ${it.status} | ${it.completedSteps}/${it.steps.size} | ${it.goal.take(80)}"
+            }
+        }
+
+        if (lower.startsWith("покажи задачу элис ")) {
+            val prefix = text.substring("покажи задачу элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            val task = matches.first()
+            val steps = task.steps.mapIndexed { index, step ->
+                val state = when {
+                    index < task.completedSteps -> "✓"
+                    task.status == "cancelled" -> "—"
+                    index == task.completedSteps -> "→"
+                    else -> "·"
+                }
+                "$state ${index + 1}. $step"
+            }
+            return "Задача: ${task.goal}\nСтатус: ${task.status}\nПрогресс: ${task.completedSteps}/${task.steps.size}\n" +
+                steps.joinToString("\n")
+        }
+
+        if (lower.startsWith("повтори задачу элис ")) {
+            val prefix = text.substring("повтори задачу элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            return try {
+                val copy = store.duplicate(matches.first().id)
+                    ?: return "Исходная задача не найдена."
+                "Создана копия плана: ${copy.id.take(8)}. Шагов: ${copy.steps.size}. Выполнение не запущено."
+            } catch (error: Exception) {
+                "Не удалось скопировать задачу: ${error.message}"
             }
         }
 

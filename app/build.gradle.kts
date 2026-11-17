@@ -12,8 +12,8 @@ android {
         applicationId = "com.zeroproject.alice"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -54,5 +54,6 @@ kotlin {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
 }
