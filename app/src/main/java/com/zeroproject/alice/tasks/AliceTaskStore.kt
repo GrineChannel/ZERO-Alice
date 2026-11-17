@@ -67,8 +67,9 @@ class AliceTaskStore(context: Context) {
         val index = tasks.indexOfFirst { it.id == id }
         if (index < 0) return@synchronized null
         val current = tasks[index]
-        if (current.status == "cancelled" || current.status == "completed" ||
-            current.completedSteps != expectedStep || expectedStep !in current.steps.indices) {
+        if (!AliceTaskExecutionPolicy.canAdvance(
+                current.status, current.completedSteps, expectedStep, current.steps.size
+            )) {
             return@synchronized null
         }
         val next = expectedStep + 1
