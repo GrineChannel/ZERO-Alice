@@ -20,6 +20,7 @@ class AliceTaskExecutor(
         // Shared by executor instances created for each chat command.
         private val runningMinecraftTasks = mutableSetOf<String>()
         private val runningLock = Any()
+        private val runningLocalTasks = mutableSetOf<String>()
     }
 
     /**
@@ -103,6 +104,8 @@ class AliceTaskExecutor(
                 message
             }
         }
+        val reserved = synchronized(runningLock) { runningLocalTasks.add(task.id) }
+        if (!reserved) return "Этот шаг задачи уже выполняется."
         return try {
             val result = when {
                 lower.startsWith("создай папку элис ") -> {
@@ -166,6 +169,8 @@ class AliceTaskExecutor(
             val message = "Шаг не выполнен: ${error.message}"
             log?.append(task.id, task.completedSteps, false, message)
             message
+        } finally {
+            synchronized(runningLock) { runningLocalTasks.remove(task.id) }
         }
     }
 }
