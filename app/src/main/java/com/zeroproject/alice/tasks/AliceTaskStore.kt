@@ -61,6 +61,27 @@ class AliceTaskStore(context: Context) {
         updated
     }
 
+    /** Advance only when the caller still owns the expected pending step. */
+    fun advanceIfCurrent(id: String, expectedStep: Int): Task? = synchronized(lock) {
+        val tasks = readAll().toMutableList()
+        val index = tasks.indexOfFirst { it.id == id }
+        if (index < 0) return@synchronized null
+        val current = tasks[index]
+        if (current.status == "cancelled" || current.status == "completed" ||
+            current.completedSteps != expectedStep || expectedStep !in current.steps.indices) {
+            return@synchronized null
+        }
+        val next = expectedStep + 1
+        val updated = current.copy(
+            completedSteps = next,
+            status = if (next == current.steps.size) "completed" else "in_progress",
+            updatedAt = System.currentTimeMillis()
+        )
+        tasks[index] = updated
+        saveAll(tasks)
+        updated
+    }
+
     fun cancel(id: String): Task? = synchronized(lock) {
         val tasks = readAll().toMutableList()
         val index = tasks.indexOfFirst { it.id == id }
