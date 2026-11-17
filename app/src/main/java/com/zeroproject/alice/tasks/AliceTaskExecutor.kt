@@ -123,8 +123,12 @@ class AliceTaskExecutor(
                     }
                     val path = args.substring(0, separator).trim()
                     val content = args.substring(separator + 4)
-                    workspace.writeText(path, content, overwrite = false)
-                    "Создан файл: $path"
+                    if (workspace.matchesText(path, content)) {
+                        "Файл уже существует с ожидаемым содержимым: $path"
+                    } else {
+                        workspace.writeText(path, content, overwrite = false)
+                        "Создан файл: $path"
+                    }
                 }
                 lower.startsWith("создай minecraft проект элис ") -> {
                     val name = step.substring("создай minecraft проект элис ".length).trim()
