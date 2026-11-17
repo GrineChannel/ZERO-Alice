@@ -53,6 +53,15 @@ class AliceWorkspace(context: Context) {
         return file.readText(Charsets.UTF_8)
     }
 
+    /** Checks a previous create result without modifying an existing file. */
+    fun matchesText(path: String, expected: String): Boolean {
+        val file = resolve(path)
+        if (!file.isFile) return false
+        val bytes = expected.toByteArray(Charsets.UTF_8)
+        if (bytes.size > 1024 * 1024 || file.length() != bytes.size.toLong()) return false
+        return file.readBytes().contentEquals(bytes)
+    }
+
     fun writeText(path: String, content: String, overwrite: Boolean = false): Entry {
         val file = resolve(path)
         require(overwrite || !file.exists()) { "Файл уже существует" }
