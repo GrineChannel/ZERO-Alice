@@ -22,6 +22,25 @@ class AliceTaskCommands(
             }
         }
 
+        if (lower.startsWith("покажи задачу элис ")) {
+            val prefix = text.substring("покажи задачу элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            val task = matches.first()
+            val steps = task.steps.mapIndexed { index, step ->
+                val state = when {
+                    index < task.completedSteps -> "✓"
+                    task.status == "cancelled" -> "—"
+                    index == task.completedSteps -> "→"
+                    else -> "·"
+                }
+                "$state ${index + 1}. $step"
+            }
+            return "Задача: ${task.goal}\nСтатус: ${task.status}\nПрогресс: ${task.completedSteps}/${task.steps.size}\n" +
+                steps.joinToString("\n")
+        }
+
         if (lower.startsWith("создай minecraft задачу элис ")) {
             val specification = text.substring("создай minecraft задачу элис ".length)
             val separator = specification.indexOf(" :: ")
