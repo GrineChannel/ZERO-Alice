@@ -49,7 +49,7 @@ class AliceTaskStore(context: Context) {
         val index = tasks.indexOfFirst { it.id == id }
         if (index < 0) return@synchronized null
         val current = tasks[index]
-        if (current.status == "cancelled") return@synchronized current
+        if (current.status == "cancelled" || current.status == "completed") return@synchronized current
         val next = (current.completedSteps + 1).coerceAtMost(current.steps.size)
         val updated = current.copy(
             completedSteps = next,
