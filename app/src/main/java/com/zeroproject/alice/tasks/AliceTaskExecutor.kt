@@ -80,7 +80,7 @@ class AliceTaskExecutor(
                             val current = store.list().firstOrNull { it.id == task.id }
                             if (current != null && current.status != "cancelled" &&
                                 current.completedSteps == task.completedSteps) {
-                                store.advance(task.id)
+                                store.advanceIfCurrent(task.id, task.completedSteps)
                             }
                         }
                         log?.append(task.id, task.completedSteps, success, details)
@@ -158,8 +158,8 @@ class AliceTaskExecutor(
                     return message
                 }
             }
-            val updated = store.advance(task.id)
-                ?: return "$result. Но не удалось сохранить прогресс."
+            val updated = store.advanceIfCurrent(task.id, task.completedSteps)
+                ?: return "$result. Прогресс не изменён: задача была отменена или шаг уже обработан."
             log?.append(task.id, task.completedSteps, true, result)
             "$result. Прогресс: ${updated.completedSteps}/${updated.steps.size}."
         } catch (error: Exception) {
