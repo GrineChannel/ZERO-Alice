@@ -140,8 +140,13 @@ class AliceTaskExecutor(
                     val path = args.substring(0, separator).trim()
                     val content = args.substring(separator + 4)
                     val editor = revisions ?: return "Редактор файлов недоступен."
-                    if (preview) editor.preview(path, content)
-                    else editor.replace(path, content)
+                    if (preview) {
+                        // Preview is read-only: it must not advance the task or claim success.
+                        val report = editor.preview(path, content)
+                        log?.append(task.id, task.completedSteps, true, "Предпросмотр без выполнения: $path")
+                        return report
+                    }
+                    editor.replace(path, content)
                 }
                 lower.startsWith("откати файл элис ") -> {
                     val editor = revisions ?: return "Редактор файлов недоступен."
