@@ -49,6 +49,23 @@ class AliceTaskStore(context: Context) {
         task
     }
 
+    /** Create a fresh plan from an existing task without copying execution state. */
+    fun duplicate(id: String): Task? = synchronized(lock) {
+        val tasks = readAll().toMutableList()
+        val original = tasks.firstOrNull { it.id == id } ?: return@synchronized null
+        val copy = Task(
+            UUID.randomUUID().toString(),
+            original.goal,
+            original.steps.toList(),
+            0,
+            "planned",
+            System.currentTimeMillis()
+        )
+        tasks.add(copy)
+        saveAll(tasks)
+        copy
+    }
+
     fun advance(id: String): Task? = synchronized(lock) {
         val tasks = readAll().toMutableList()
         val index = tasks.indexOfFirst { it.id == id }
