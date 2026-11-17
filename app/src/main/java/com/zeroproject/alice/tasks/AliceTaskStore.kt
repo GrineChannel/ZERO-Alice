@@ -1,6 +1,7 @@
 package com.zeroproject.alice.tasks
 
 import android.content.Context
+import android.util.AtomicFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -12,6 +13,7 @@ import java.util.UUID
  */
 class AliceTaskStore(context: Context) {
     private val file = File(context.filesDir, "alice_tasks.json")
+    private val atomicFile = AtomicFile(file)
     companion object {
         // Task stores created by separate chat commands share one file lock.
         private val lock = Any()
@@ -99,8 +101,8 @@ class AliceTaskStore(context: Context) {
     }
 
     private fun readAll(): List<Task> {
-        if (!file.exists()) return emptyList()
-        val array = JSONArray(file.readText(Charsets.UTF_8))
+        if (!file.exists() && !File(file.path + ".bak").exists()) return emptyList()
+        val array = JSONArray(atomicFile.openRead().bufferedReader(Charsets.UTF_8).use { it.readText() })
         return (0 until array.length()).map { index ->
             val item = array.getJSONObject(index)
             val steps = item.getJSONArray("steps")
@@ -127,11 +129,13 @@ class AliceTaskStore(context: Context) {
             item.put("updatedAt", task.updatedAt)
             array.put(item)
         }
-        val temp = File(file.parentFile, "${file.name}.tmp")
-        temp.writeText(array.toString(), Charsets.UTF_8)
-        if (!temp.renameTo(file)) {
-            temp.delete()
-            throw IllegalStateException("Не удалось сохранить задачи")
+        val stream = atomicFile.startWrite()
+        try {
+            stream.write(array.toString().toByteArray(Charsets.UTF_8))
+            atomicFile.finishWrite(stream)
+        } catch (error: Exception) {
+            atomicFile.failWrite(stream)
+            throw error
         }
     }
 }
