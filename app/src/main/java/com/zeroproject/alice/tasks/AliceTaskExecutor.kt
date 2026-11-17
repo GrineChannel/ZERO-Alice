@@ -36,8 +36,8 @@ class AliceTaskExecutor(
             if (before.status == "completed" || before.status == "cancelled") break
             // Batch execution never overwrites existing files or performs undo.
             val pending = before.steps.getOrNull(before.completedSteps)?.trim()?.lowercase().orEmpty()
-            if (pending.startsWith("замени файл элис ") || pending.startsWith("откати файл элис ") || pending.startsWith("разработай minecraft элис ")) {
-                messages.add("Этот шаг требует отдельной команды «выполни шаг элис ID».")
+            if (pending.startsWith("предпросмотр замены элис ") || pending.startsWith("замени файл элис ") || pending.startsWith("откати файл элис ") || pending.startsWith("разработай minecraft элис ")) {
+                messages.add("Этот шаг требует отдельной команды «выполни шаг элис ID». Предпросмотр не завершает задачу.")
                 break
             }
             val result = executeNext(taskId)
