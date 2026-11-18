@@ -328,6 +328,9 @@ class AliceModelDownloader(context: Context) {
             val buffer = ByteArray(BUFFER_SIZE)
 
             while (true) {
+                if (cancelled) {
+                    throw java.io.InterruptedIOException("Проверка модели отменена")
+                }
                 val count = input.read(buffer)
                 if (count == -1) break
                 digest.update(buffer, 0, count)
