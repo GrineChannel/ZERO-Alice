@@ -165,9 +165,9 @@ class AliceModelDownloader(context: Context) {
                     append = false
                     totalBytes = conn.contentLengthLong
 
-                    if (existingBytes > 0) {
-                        partialFile.delete()
-                    }
+                    // Keep the resumable partial file until free-space checks pass.
+                    // FileOutputStream(partialFile, false) will truncate it only
+                    // when the replacement download is ready to begin.
                 }
 
                 else -> throw Exception(
