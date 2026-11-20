@@ -145,20 +145,25 @@ class AliceModelDownloader(context: Context) {
                     // A resumed response must begin exactly at our saved byte offset.
                     val range = conn.getHeaderField("Content-Range")
                         ?: throw Exception("Сервер не указал Content-Range")
-                    val start = range.substringAfter("bytes ", "")
-                        .substringBefore("-").toLongOrNull()
-                    if (existingBytes <= 0L || start != existingBytes) {
+                    val match = Regex("""bytes (\\d+)-(\\d+)/(\\d+)""")
+                        .matchEntire(range)
+                        ?: throw Exception("Некорректный Content-Range")
+                    val (startText, endText, totalText) = match.destructured
+                    val start = startText.toLongOrNull()
+                    val end = endText.toLongOrNull()
+                    val total = totalText.toLongOrNull()
+                    if (existingBytes <= 0L || start != existingBytes ||
+                        end == null || total == null ||
+                        end < start || end >= total
+                    ) {
                         throw Exception("Сервер вернул неверный диапазон загрузки")
                     }
+                    val responseLength = conn.contentLengthLong
+                    if (responseLength >= 0 && responseLength != end - start + 1) {
+                        throw Exception("Размер ответа не совпадает с Content-Range")
+                    }
                     append = true
-
-                    totalBytes =
-                        conn.getHeaderField("Content-Range")
-                            ?.substringAfter("/")
-                            ?.toLongOrNull()
-                            ?: throw Exception(
-                                "Не удалось определить размер файла"
-                            )
+                    totalBytes = total
                 }
 
                 HttpURLConnection.HTTP_OK -> {
