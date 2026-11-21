@@ -145,7 +145,7 @@ class AliceModelDownloader(context: Context) {
                     // A resumed response must begin exactly at our saved byte offset.
                     val range = conn.getHeaderField("Content-Range")
                         ?: throw Exception("Сервер не указал Content-Range")
-                    val match = Regex("""bytes (\\d+)-(\\d+)/(\\d+)""")
+                    val match = Regex("""bytes (\d+)-(\d+)/(\d+)""")
                         .matchEntire(range)
                         ?: throw Exception("Некорректный Content-Range")
                     val (startText, endText, totalText) = match.destructured
