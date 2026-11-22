@@ -6,7 +6,7 @@ package com.zeroproject.alice.tasks
  */
 object AliceTaskExecutionPolicy {
     fun canAdvance(status: String, completedSteps: Int, expectedStep: Int, totalSteps: Int): Boolean =
-        status != "cancelled" && status != "completed" &&
+        status != "cancelled" && status != "completed" && status != "paused" &&
             expectedStep >= 0 && expectedStep < totalSteps &&
             completedSteps == expectedStep
 
