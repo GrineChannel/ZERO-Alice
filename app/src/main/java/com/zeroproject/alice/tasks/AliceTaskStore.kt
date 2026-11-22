@@ -105,6 +105,36 @@ class AliceTaskStore(context: Context) {
         updated
     }
 
+    /** Pause a plan without losing completed steps. */
+    fun pause(id: String): Task? = synchronized(lock) {
+        val tasks = readAll().toMutableList()
+        val index = tasks.indexOfFirst { it.id == id }
+        if (index < 0) return@synchronized null
+        val current = tasks[index]
+        if (current.status == "completed" || current.status == "cancelled" ||
+            current.status == "paused") return@synchronized current
+        val updated = current.copy(status = "paused", updatedAt = System.currentTimeMillis())
+        tasks[index] = updated
+        saveAll(tasks)
+        updated
+    }
+
+    /** Resume a paused plan; does not automatically execute any steps. */
+    fun resume(id: String): Task? = synchronized(lock) {
+        val tasks = readAll().toMutableList()
+        val index = tasks.indexOfFirst { it.id == id }
+        if (index < 0) return@synchronized null
+        val current = tasks[index]
+        if (current.status != "paused") return@synchronized current
+        val updated = current.copy(
+            status = if (current.completedSteps == 0) "planned" else "in_progress",
+            updatedAt = System.currentTimeMillis()
+        )
+        tasks[index] = updated
+        saveAll(tasks)
+        updated
+    }
+
     fun cancel(id: String): Task? = synchronized(lock) {
         val tasks = readAll().toMutableList()
         val index = tasks.indexOfFirst { it.id == id }
