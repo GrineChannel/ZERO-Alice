@@ -14,6 +14,29 @@ class AliceTaskCommands(
         val text = input.trim()
         val lower = text.lowercase()
 
+        if (lower == "очередь задач элис") {
+            val tasks = store.queue()
+            if (tasks.isEmpty()) return "В очереди нет активных задач."
+            return tasks.take(30).mapIndexed { index, task ->
+                "${index + 1}. ${task.id.take(8)} | ${task.completedSteps}/${task.steps.size} | ${task.goal.take(65)}"
+            }.joinToString("\n")
+        }
+
+        if (lower.startsWith("подними задачу элис ") ||
+            lower.startsWith("опусти задачу элис ")) {
+            val up = lower.startsWith("подними задачу элис ")
+            val command = if (up) "подними задачу элис " else "опусти задачу элис "
+            val prefix = text.substring(command.length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.queue().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Активная задача не найдена или идентификатор неоднозначен."
+            return if (store.move(matches.first().id, if (up) -1 else 1)) {
+                "Порядок очереди изменён. Посмотри «очередь задач элис»."
+            } else {
+                "Нельзя переместить задачу в этом направлении."
+            }
+        }
+
         if (lower == "статистика задач элис") {
             val tasks = store.list()
             val completed = tasks.count { it.status == "completed" }
