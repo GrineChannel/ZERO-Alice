@@ -14,11 +14,93 @@ class AliceTaskCommands(
         val text = input.trim()
         val lower = text.lowercase()
 
+        if (lower == "выполни очередь элис") {
+            return executor?.executeQueuePass()
+                ?: "Исполнитель задач пока недоступен."
+        }
+
+        if (lower == "выполни следующую задачу элис") {
+            val next = store.queue().firstOrNull()
+                ?: return "Очередь пуста: активных задач нет."
+            return executor?.executeNext(next.id)
+                ?: "Исполнитель задач пока недоступен."
+        }
+
+        if (lower == "очередь задач элис") {
+            val tasks = store.queue()
+            if (tasks.isEmpty()) return "В очереди нет активных задач."
+            return tasks.take(30).mapIndexed { index, task ->
+                "${index + 1}. ${task.id.take(8)} | ${task.completedSteps}/${task.steps.size} | ${task.goal.take(65)}"
+            }.joinToString("\n")
+        }
+
+        if (lower.startsWith("подними задачу элис ") ||
+            lower.startsWith("опусти задачу элис ")) {
+            val up = lower.startsWith("подними задачу элис ")
+            val command = if (up) "подними задачу элис " else "опусти задачу элис "
+            val prefix = text.substring(command.length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.queue().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Активная задача не найдена или идентификатор неоднозначен."
+            return if (store.move(matches.first().id, if (up) -1 else 1)) {
+                "Порядок очереди изменён. Посмотри «очередь задач элис»."
+            } else {
+                "Нельзя переместить задачу в этом направлении."
+            }
+        }
+
+        if (lower == "статистика задач элис") {
+            val tasks = store.list()
+            val completed = tasks.count { it.status == "completed" }
+            val cancelled = tasks.count { it.status == "cancelled" }
+            val inProgress = tasks.count { it.status == "in_progress" }
+            val planned = tasks.count { it.status == "planned" }
+            val paused = tasks.count { it.status == "paused" }
+            val finishedSteps = tasks.sumOf { it.completedSteps }
+            val totalSteps = tasks.sumOf { it.steps.size }
+            return "Всего задач: ${tasks.size}. Запланировано: $planned. " +
+                "В работе: $inProgress. На паузе: $paused. Завершено: $completed. Отменено: $cancelled. " +
+                "Выполнено шагов: $finishedSteps/$totalSteps."
+        }
+
         if (lower == "покажи задачи элис" || lower == "список задач элис") {
             val tasks = store.list()
             if (tasks.isEmpty()) return "Задач пока нет."
             return tasks.takeLast(20).joinToString("\n") {
                 "${it.id.take(8)} | ${it.status} | ${it.completedSteps}/${it.steps.size} | ${it.goal.take(80)}"
+            }
+        }
+
+        if (lower.startsWith("покажи задачу элис ")) {
+            val prefix = text.substring("покажи задачу элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            val task = matches.first()
+            val steps = task.steps.mapIndexed { index, step ->
+                val state = when {
+                    index < task.completedSteps -> "✓"
+                    task.status == "cancelled" -> "—"
+                    index == task.completedSteps -> "→"
+                    else -> "·"
+                }
+                "$state ${index + 1}. $step"
+            }
+            return "Задача: ${task.goal}\nСтатус: ${task.status}\nПрогресс: ${task.completedSteps}/${task.steps.size}\n" +
+                steps.joinToString("\n")
+        }
+
+        if (lower.startsWith("повтори задачу элис ")) {
+            val prefix = text.substring("повтори задачу элис ".length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            return try {
+                val copy = store.duplicate(matches.first().id)
+                    ?: return "Исходная задача не найдена."
+                "Создана копия плана: ${copy.id.take(8)}. Шагов: ${copy.steps.size}. Выполнение не запущено."
+            } catch (error: Exception) {
+                "Не удалось скопировать задачу: ${error.message}"
             }
         }
 
@@ -103,6 +185,20 @@ class AliceTaskCommands(
             if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
             return executor?.executeNext(matches.first().id)
                 ?: "Исполнитель задач пока недоступен."
+        }
+
+        if (lower.startsWith("приостанови задачу элис ") ||
+            lower.startsWith("возобнови задачу элис ")) {
+            val pausing = lower.startsWith("приостанови задачу элис ")
+            val command = if (pausing) "приостанови задачу элис " else "возобнови задачу элис "
+            val prefix = text.substring(command.length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            val updated = (if (pausing) store.pause(matches.first().id) else store.resume(matches.first().id))
+                ?: return "Задача не найдена."
+            return "Задача ${updated.id.take(8)}: ${updated.status}, " +
+                "${updated.completedSteps}/${updated.steps.size} шагов."
         }
 
         if (lower.startsWith("шаг задачи элис ")) {

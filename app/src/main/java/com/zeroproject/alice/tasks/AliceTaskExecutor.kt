@@ -20,6 +20,7 @@ class AliceTaskExecutor(
         // Shared by executor instances created for each chat command.
         private val runningMinecraftTasks = mutableSetOf<String>()
         private val runningLock = Any()
+        private val runningLocalTasks = mutableSetOf<String>()
     }
 
     /**
@@ -33,11 +34,11 @@ class AliceTaskExecutor(
         for (index in 0 until limit) {
             val before = store.list().firstOrNull { it.id == taskId }
                 ?: return "Задача не найдена."
-            if (before.status == "completed" || before.status == "cancelled") break
+            if (before.status == "completed" || before.status == "cancelled" || before.status == "paused") break
             // Batch execution never overwrites existing files or performs undo.
             val pending = before.steps.getOrNull(before.completedSteps)?.trim()?.lowercase().orEmpty()
-            if (pending.startsWith("замени файл элис ") || pending.startsWith("откати файл элис ") || pending.startsWith("разработай minecraft элис ")) {
-                messages.add("Этот шаг требует отдельной команды «выполни шаг элис ID».")
+            if (AliceTaskExecutionPolicy.requiresSingleStep(pending)) {
+                messages.add("Этот шаг требует отдельной команды «выполни шаг элис ID». Предпросмотр не завершает задачу.")
                 break
             }
             val result = executeNext(taskId)
@@ -54,9 +55,27 @@ class AliceTaskExecutor(
         }
     }
 
+    /**
+     * A bounded, user-triggered scheduler pass. Each selected task receives
+     * at most one step; no background loop or unrestricted autonomy.
+     */
+    fun executeQueuePass(maxTasks: Int = 3): String {
+        val active = store.queue()
+        if (active.isEmpty()) return "Очередь пуста: активных задач нет."
+        val safe = active.filter { task ->
+            val step = task.steps.getOrNull(task.completedSteps).orEmpty()
+            !AliceTaskExecutionPolicy.requiresSingleStep(step)
+        }
+        if (safe.isEmpty()) return "В очереди только шаги, требующие отдельной команды."
+        return safe.take(maxTasks.coerceIn(1, 5)).joinToString("\n") { task ->
+            "${task.id.take(8)}: ${executeNext(task.id)}"
+        }
+    }
+
     fun executeNext(taskId: String): String {
         val task = store.list().firstOrNull { it.id == taskId }
             ?: return "Задача не найдена."
+        if (task.status == "paused") return "Задача приостановлена. Сначала используй «возобнови задачу элис ID»."
         if (task.status == "cancelled" || task.status == "completed") {
             return "Задача уже завершена или отменена."
         }
@@ -71,16 +90,18 @@ class AliceTaskExecutor(
             val goal = args.substring(separator + 4).trim()
             if (goal.isBlank()) return "Цель разработки не указана."
             val launcher = launchMinecraft ?: return "Запуск Minecraft-разработки недоступен."
-            val reserved = synchronized(runningLock) { runningMinecraftTasks.add(task.id) }
+            val reserved = synchronized(runningLock) {
+                if (runningLocalTasks.contains(task.id)) false else runningMinecraftTasks.add(task.id)
+            }
             if (!reserved) return "Minecraft-разработка по этой задаче уже выполняется."
             return try {
                 val accepted = launcher(projectId, goal) { success, details ->
                     try {
                         if (success) {
                             val current = store.list().firstOrNull { it.id == task.id }
-                            if (current != null && current.status != "cancelled" &&
+                            if (current != null && current.status != "cancelled" && current.status != "paused" &&
                                 current.completedSteps == task.completedSteps) {
-                                store.advance(task.id)
+                                store.advanceIfCurrent(task.id, task.completedSteps)
                             }
                         }
                         log?.append(task.id, task.completedSteps, success, details)
@@ -103,6 +124,10 @@ class AliceTaskExecutor(
                 message
             }
         }
+        val reserved = synchronized(runningLock) {
+            if (runningMinecraftTasks.contains(task.id)) false else runningLocalTasks.add(task.id)
+        }
+        if (!reserved) return "Этот шаг задачи уже выполняется."
         return try {
             val result = when {
                 lower.startsWith("создай папку элис ") -> {
@@ -120,8 +145,12 @@ class AliceTaskExecutor(
                     }
                     val path = args.substring(0, separator).trim()
                     val content = args.substring(separator + 4)
-                    workspace.writeText(path, content, overwrite = false)
-                    "Создан файл: $path"
+                    if (workspace.matchesText(path, content)) {
+                        "Файл уже существует с ожидаемым содержимым: $path"
+                    } else {
+                        workspace.writeText(path, content, overwrite = false)
+                        "Создан файл: $path"
+                    }
                 }
                 lower.startsWith("создай minecraft проект элис ") -> {
                     val name = step.substring("создай minecraft проект элис ".length).trim()
@@ -140,8 +169,13 @@ class AliceTaskExecutor(
                     val path = args.substring(0, separator).trim()
                     val content = args.substring(separator + 4)
                     val editor = revisions ?: return "Редактор файлов недоступен."
-                    if (preview) editor.preview(path, content)
-                    else editor.replace(path, content)
+                    if (preview) {
+                        // Preview is read-only: it must not advance the task or claim success.
+                        val report = editor.preview(path, content)
+                        log?.append(task.id, task.completedSteps, true, "Предпросмотр без выполнения: $path")
+                        return report
+                    }
+                    editor.replace(path, content)
                 }
                 lower.startsWith("откати файл элис ") -> {
                     val editor = revisions ?: return "Редактор файлов недоступен."
@@ -153,14 +187,16 @@ class AliceTaskExecutor(
                     return message
                 }
             }
-            val updated = store.advance(task.id)
-                ?: return "$result. Но не удалось сохранить прогресс."
+            val updated = store.advanceIfCurrent(task.id, task.completedSteps)
+                ?: return "$result. Прогресс не изменён: задача была отменена или шаг уже обработан."
             log?.append(task.id, task.completedSteps, true, result)
             "$result. Прогресс: ${updated.completedSteps}/${updated.steps.size}."
         } catch (error: Exception) {
             val message = "Шаг не выполнен: ${error.message}"
             log?.append(task.id, task.completedSteps, false, message)
             message
+        } finally {
+            synchronized(runningLock) { runningLocalTasks.remove(task.id) }
         }
     }
 }

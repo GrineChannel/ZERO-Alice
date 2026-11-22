@@ -3,6 +3,8 @@ name: ZERO Alice Android Build
 
 on:
   push:
+    branches: [main, develop/alice-0.3.0]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -52,7 +54,7 @@ jobs:
           ALICE_KEY_PASSWORD: ${{ secrets.ALICE_KEY_PASSWORD }}
         with:
           gradle-version: 8.9
-          arguments: --stacktrace assembleDebug assembleRelease
+          arguments: --stacktrace testDebugUnitTest assembleDebug assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
