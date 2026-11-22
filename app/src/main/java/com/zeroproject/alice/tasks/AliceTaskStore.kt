@@ -109,16 +109,14 @@ class AliceTaskStore(context: Context) {
     fun move(id: String, direction: Int): Boolean = synchronized(lock) {
         require(direction == -1 || direction == 1) { "Направление должно быть -1 или 1" }
         val tasks = readAll().toMutableList()
-        val index = tasks.indexOfFirst { it.id == id }
-        if (index < 0 || tasks[index].status == "completed" ||
-            tasks[index].status == "cancelled") return@synchronized false
-        val target = index + direction
-        if (target !in tasks.indices) return@synchronized false
-        val other = tasks[target]
-        if (other.status == "completed" || other.status == "cancelled") {
-            return@synchronized false
+        val activeIndices = tasks.indices.filter { index ->
+            tasks[index].status == "planned" || tasks[index].status == "in_progress"
         }
-        java.util.Collections.swap(tasks, index, target)
+        val position = activeIndices.indexOfFirst { tasks[it].id == id }
+        if (position < 0) return@synchronized false
+        val next = position + direction
+        if (next !in activeIndices.indices) return@synchronized false
+        java.util.Collections.swap(tasks, activeIndices[position], activeIndices[next])
         saveAll(tasks)
         true
     }
