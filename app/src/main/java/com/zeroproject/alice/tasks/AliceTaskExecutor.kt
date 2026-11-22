@@ -34,7 +34,7 @@ class AliceTaskExecutor(
         for (index in 0 until limit) {
             val before = store.list().firstOrNull { it.id == taskId }
                 ?: return "Задача не найдена."
-            if (before.status == "completed" || before.status == "cancelled") break
+            if (before.status == "completed" || before.status == "cancelled" || before.status == "paused") break
             // Batch execution never overwrites existing files or performs undo.
             val pending = before.steps.getOrNull(before.completedSteps)?.trim()?.lowercase().orEmpty()
             if (AliceTaskExecutionPolicy.requiresSingleStep(pending)) {
@@ -58,6 +58,7 @@ class AliceTaskExecutor(
     fun executeNext(taskId: String): String {
         val task = store.list().firstOrNull { it.id == taskId }
             ?: return "Задача не найдена."
+        if (task.status == "paused") return "Задача приостановлена. Сначала используй «возобнови задачу элис ID»."
         if (task.status == "cancelled" || task.status == "completed") {
             return "Задача уже завершена или отменена."
         }
@@ -81,7 +82,7 @@ class AliceTaskExecutor(
                     try {
                         if (success) {
                             val current = store.list().firstOrNull { it.id == task.id }
-                            if (current != null && current.status != "cancelled" &&
+                            if (current != null && current.status != "cancelled" && current.status != "paused" &&
                                 current.completedSteps == task.completedSteps) {
                                 store.advanceIfCurrent(task.id, task.completedSteps)
                             }
