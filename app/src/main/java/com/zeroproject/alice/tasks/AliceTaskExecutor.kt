@@ -60,9 +60,14 @@ class AliceTaskExecutor(
      * at most one step; no background loop or unrestricted autonomy.
      */
     fun executeQueuePass(maxTasks: Int = 3): String {
-        val candidates = store.queue().take(maxTasks.coerceIn(1, 5))
-        if (candidates.isEmpty()) return "Очередь пуста: активных задач нет."
-        return candidates.joinToString("\n") { task ->
+        val active = store.queue()
+        if (active.isEmpty()) return "Очередь пуста: активных задач нет."
+        val safe = active.filter { task ->
+            val step = task.steps.getOrNull(task.completedSteps).orEmpty()
+            !AliceTaskExecutionPolicy.requiresSingleStep(step)
+        }
+        if (safe.isEmpty()) return "В очереди только шаги, требующие отдельной команды."
+        return safe.take(maxTasks.coerceIn(1, 5)).joinToString("\n") { task ->
             "${task.id.take(8)}: ${executeNext(task.id)}"
         }
     }
