@@ -20,10 +20,11 @@ class AliceTaskCommands(
             val cancelled = tasks.count { it.status == "cancelled" }
             val inProgress = tasks.count { it.status == "in_progress" }
             val planned = tasks.count { it.status == "planned" }
+            val paused = tasks.count { it.status == "paused" }
             val finishedSteps = tasks.sumOf { it.completedSteps }
             val totalSteps = tasks.sumOf { it.steps.size }
             return "Всего задач: ${tasks.size}. Запланировано: $planned. " +
-                "В работе: $inProgress. Завершено: $completed. Отменено: $cancelled. " +
+                "В работе: $inProgress. На паузе: $paused. Завершено: $completed. Отменено: $cancelled. " +
                 "Выполнено шагов: $finishedSteps/$totalSteps."
         }
 
@@ -159,7 +160,7 @@ class AliceTaskCommands(
             if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
             val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
             if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
-            val updated = if (pausing) store.pause(matches.first().id) else store.resume(matches.first().id)
+            val updated = (if (pausing) store.pause(matches.first().id) else store.resume(matches.first().id))
                 ?: return "Задача не найдена."
             return "Задача ${updated.id.take(8)}: ${updated.status}, " +
                 "${updated.completedSteps}/${updated.steps.size} шагов."
