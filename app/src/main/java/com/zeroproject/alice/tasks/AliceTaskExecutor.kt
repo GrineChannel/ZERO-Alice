@@ -55,6 +55,18 @@ class AliceTaskExecutor(
         }
     }
 
+    /**
+     * A bounded, user-triggered scheduler pass. Each selected task receives
+     * at most one step; no background loop or unrestricted autonomy.
+     */
+    fun executeQueuePass(maxTasks: Int = 3): String {
+        val candidates = store.queue().take(maxTasks.coerceIn(1, 5))
+        if (candidates.isEmpty()) return "Очередь пуста: активных задач нет."
+        return candidates.joinToString("\n") { task ->
+            "${task.id.take(8)}: ${executeNext(task.id)}"
+        }
+    }
+
     fun executeNext(taskId: String): String {
         val task = store.list().firstOrNull { it.id == taskId }
             ?: return "Задача не найдена."
