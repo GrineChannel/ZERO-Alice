@@ -218,6 +218,10 @@ class AliceModelDownloader(context: Context) {
 
                         if (count == -1) break
 
+                        // Reject oversized responses before writing beyond the advertised model size.
+                        if (count.toLong() > totalBytes - downloaded) {
+                            throw Exception("Сервер передал больше данных, чем заявлено")
+                        }
                         output.write(buffer, 0, count)
                         downloaded += count
 
