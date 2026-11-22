@@ -12,6 +12,7 @@ class AliceTaskExecutionPolicyTest {
 
     @Test fun staleOrFinishedStepsCannotAdvance() {
         assertFalse(AliceTaskExecutionPolicy.canAdvance("cancelled", 0, 0, 2))
+        assertFalse(AliceTaskExecutionPolicy.canAdvance("paused", 0, 0, 2))
         assertFalse(AliceTaskExecutionPolicy.canAdvance("completed", 2, 2, 2))
         assertFalse(AliceTaskExecutionPolicy.canAdvance("in_progress", 1, 0, 2))
         assertFalse(AliceTaskExecutionPolicy.canAdvance("planned", 0, -1, 2))
