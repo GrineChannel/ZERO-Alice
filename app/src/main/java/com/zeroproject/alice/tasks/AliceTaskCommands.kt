@@ -14,6 +14,11 @@ class AliceTaskCommands(
         val text = input.trim()
         val lower = text.lowercase()
 
+        if (lower == "выполни очередь элис") {
+            return executor?.executeQueuePass()
+                ?: "Исполнитель задач пока недоступен."
+        }
+
         if (lower == "выполни следующую задачу элис") {
             val next = store.queue().firstOrNull()
                 ?: return "Очередь пуста: активных задач нет."
