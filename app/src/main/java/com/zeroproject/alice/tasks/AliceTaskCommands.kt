@@ -151,6 +151,20 @@ class AliceTaskCommands(
                 ?: "Исполнитель задач пока недоступен."
         }
 
+        if (lower.startsWith("приостанови задачу элис ") ||
+            lower.startsWith("возобнови задачу элис ")) {
+            val pausing = lower.startsWith("приостанови задачу элис ")
+            val command = if (pausing) "приостанови задачу элис " else "возобнови задачу элис "
+            val prefix = text.substring(command.length).trim()
+            if (prefix.length < 4) return "Укажи идентификатор задачи (не менее 4 символов)."
+            val matches = store.list().filter { it.id.startsWith(prefix, ignoreCase = true) }
+            if (matches.size != 1) return "Задача не найдена или идентификатор неоднозначен."
+            val updated = if (pausing) store.pause(matches.first().id) else store.resume(matches.first().id)
+                ?: return "Задача не найдена."
+            return "Задача ${updated.id.take(8)}: ${updated.status}, " +
+                "${updated.completedSteps}/${updated.steps.size} шагов."
+        }
+
         if (lower.startsWith("шаг задачи элис ")) {
             val prefix = text.substring("шаг задачи элис ".length).trim()
             return update(prefix, advance = true)
