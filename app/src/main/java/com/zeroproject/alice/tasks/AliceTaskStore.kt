@@ -105,6 +105,29 @@ class AliceTaskStore(context: Context) {
         updated
     }
 
+    /** Move a non-terminal plan up or down in the persisted task queue. */
+    fun move(id: String, direction: Int): Boolean = synchronized(lock) {
+        require(direction == -1 || direction == 1) { "Направление должно быть -1 или 1" }
+        val tasks = readAll().toMutableList()
+        val index = tasks.indexOfFirst { it.id == id }
+        if (index < 0 || tasks[index].status == "completed" ||
+            tasks[index].status == "cancelled") return@synchronized false
+        val target = index + direction
+        if (target !in tasks.indices) return@synchronized false
+        val other = tasks[target]
+        if (other.status == "completed" || other.status == "cancelled") {
+            return@synchronized false
+        }
+        java.util.Collections.swap(tasks, index, target)
+        saveAll(tasks)
+        true
+    }
+
+    /** Queue order is stable across app restarts; this returns runnable plans only. */
+    fun queue(): List<Task> = synchronized(lock) {
+        readAll().filter { it.status == "planned" || it.status == "in_progress" }
+    }
+
     /** Pause a plan without losing completed steps. */
     fun pause(id: String): Task? = synchronized(lock) {
         val tasks = readAll().toMutableList()
