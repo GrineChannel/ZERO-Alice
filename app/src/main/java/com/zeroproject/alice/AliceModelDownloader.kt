@@ -93,7 +93,7 @@ class AliceModelDownloader(context: Context) {
         executor.shutdown()
     }
 
-    private fun download(listener: Listener) {
+    private fun download(listener: Listener, allowResume: Boolean = true) {
         try {
             recoverInterruptedReplacement()
             if (isModelDownloaded()) {
@@ -106,7 +106,7 @@ class AliceModelDownloader(context: Context) {
             }
 
             val existingBytes =
-                if (partialFile.exists()) partialFile.length()
+                if (allowResume && partialFile.exists()) partialFile.length()
                 else 0L
 
             val conn =
@@ -173,6 +173,35 @@ class AliceModelDownloader(context: Context) {
                     // Keep the resumable partial file until free-space checks pass.
                     // FileOutputStream(partialFile, false) will truncate it only
                     // when the replacement download is ready to begin.
+                }
+
+                416 -> {
+                    if (!allowResume || existingBytes <= 0L) {
+                        throw Exception("Сервер отклонил запрос загрузки: HTTP 416")
+                    }
+                    val total = conn.getHeaderField("Content-Range")
+                        ?.let { Regex("""bytes \*/(\d+)""").matchEntire(it) }
+                        ?.groupValues?.get(1)?.toLongOrNull()
+                    if (total == existingBytes && partialFile.length() == existingBytes &&
+                        verifyModel(partialFile)
+                    ) {
+                        if (cancelled) {
+                            listenerCancelled(listener)
+                            return
+                        }
+                        installVerifiedPartial(listener)
+                        return
+                    }
+                    // Retry once without Range; preserve the partial file until
+                    // the normal free-space check and input stream opening succeed.
+                    conn.disconnect()
+                    connection = null
+                    if (cancelled) {
+                        listenerCancelled(listener)
+                        return
+                    }
+                    download(listener, allowResume = false)
+                    return
                 }
 
                 else -> throw Exception(
@@ -262,30 +291,7 @@ class AliceModelDownloader(context: Context) {
                 listenerCancelled(listener)
                 return
             }
-            // Preserve the old file until the verified replacement is installed.
-            val backupFile = File(appContext.filesDir, "$MODEL_NAME.backup")
-            val hadOldModel = modelFile.exists()
-            if (hadOldModel) {
-                if (backupFile.exists() && !backupFile.delete()) {
-                    throw Exception("Не удалось очистить резервную копию модели")
-                }
-                if (!modelFile.renameTo(backupFile)) {
-                    throw Exception("Не удалось сохранить резервную копию модели")
-                }
-            }
-
-            if (!partialFile.renameTo(modelFile)) {
-                if (hadOldModel && !backupFile.renameTo(modelFile)) {
-                    throw Exception("Не удалось сохранить модель и восстановить резервную копию")
-                }
-                throw Exception("Не удалось сохранить модель")
-            }
-
-            if (hadOldModel) {
-                backupFile.delete()
-            }
-
-            listenerComplete(listener, modelFile)
+            installVerifiedPartial(listener)
 
         } catch (e: Exception) {
             if (cancelled) {
@@ -300,6 +306,33 @@ class AliceModelDownloader(context: Context) {
             connection?.disconnect()
             connection = null
         }
+    }
+
+    private fun installVerifiedPartial(listener: Listener) {
+        // Preserve the old file until the verified replacement is installed.
+        val backupFile = File(appContext.filesDir, "$MODEL_NAME.backup")
+        val hadOldModel = modelFile.exists()
+        if (hadOldModel) {
+            if (backupFile.exists() && !backupFile.delete()) {
+                throw Exception("Не удалось очистить резервную копию модели")
+            }
+            if (!modelFile.renameTo(backupFile)) {
+                throw Exception("Не удалось сохранить резервную копию модели")
+            }
+        }
+
+        if (!partialFile.renameTo(modelFile)) {
+            if (hadOldModel && !backupFile.renameTo(modelFile)) {
+                throw Exception("Не удалось сохранить модель и восстановить резервную копию")
+            }
+            throw Exception("Не удалось сохранить модель")
+        }
+
+        if (hadOldModel) {
+            backupFile.delete()
+        }
+
+        listenerComplete(listener, modelFile)
     }
 
     /**
