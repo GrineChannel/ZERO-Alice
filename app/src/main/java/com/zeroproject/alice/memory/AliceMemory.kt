@@ -144,12 +144,29 @@ class AliceMemory(context: Context) {
             put("timestamp", System.currentTimeMillis())
         }
 
-        return helper.writableDatabase.insertWithOnConflict(
-            "facts",
-            null,
-            values,
-            SQLiteDatabase.CONFLICT_REPLACE
-        )
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            // Update in place to preserve the identity of an existing fact.
+            val existingId = db.query(
+                "facts", arrayOf("id"), "fact_key = ?",
+                arrayOf(key), null, null, null
+            ).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0) else null
+            }
+
+            val id = if (existingId != null) {
+                db.update("facts", values, "id = ?", arrayOf(existingId.toString()))
+                existingId
+            } else {
+                db.insert("facts", null, values)
+            }
+
+            db.setTransactionSuccessful()
+            return id
+        } finally {
+            db.endTransaction()
+        }
     }
 
     // Получение всех сохранённых фактов.
